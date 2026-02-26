@@ -113,58 +113,59 @@ curl http://localhost:8000/api/runs
 ## Project Structure
 
 ```
-backend/
-  app/
-    main.py              # FastAPI app, lifespan, middleware
-    config.py            # Pydantic settings from .env
-    database.py          # Async SQLAlchemy engine + session
-    models.py            # SQLAlchemy Run model
-    schemas.py           # Pydantic request/response schemas
-    routers/
-      chat.py            # POST /api/chat, /api/chat/stream
-      runs.py            # GET/DELETE /api/runs
-      health.py          # GET /health
-    adapters/
-      base.py            # ProviderAdapter ABC
-      registry.py        # Auto-discovery + registration
-      openai_adapter.py  # Full implementation
-      anthropic_adapter.py # Full implementation
-      openai_compatible_adapter.py # For local models
-      google_adapter.py  # Scaffold
-      mistral_adapter.py # Scaffold
-      groq_adapter.py    # Scaffold
-      together_adapter.py # Scaffold
-      azure_openai_adapter.py # Scaffold
-    middleware/
-      request_logging.py # Request ID + structured logging
-    agentic/
-      tools.py           # Tool registry stub
-      memory.py          # Memory store interface stub
-      traces.py          # Trace context stub
-  tests/
-  migrations/
-  pyproject.toml
-  alembic.ini
-  .env.example
-
-frontend/
-  src/
-    main.tsx
-    App.tsx
-    api/
-      client.ts          # Typed fetch wrapper
-      types.ts           # TypeScript interfaces
-    hooks/
-      useStream.ts       # SSE streaming hook
-    pages/
-      Playground.tsx     # Main playground UI
-      History.tsx        # Run history table
-      RunDetail.tsx      # Single run detail + export
-    components/
-      Layout.tsx         # App shell with nav
-      StreamOutput.tsx   # Streaming text display
-      MetadataPanel.tsx  # Response metadata grid
-    index.css            # Global styles (dark theme)
+.
+├── backend/
+│   ├── app/
+│   │   ├── main.py              # FastAPI app, lifespan, middleware
+│   │   ├── config.py            # Pydantic settings from .env
+│   │   ├── database.py          # Async SQLAlchemy engine + session
+│   │   ├── models.py            # SQLAlchemy Run model
+│   │   ├── schemas.py           # Pydantic request/response schemas
+│   │   ├── routers/
+│   │   │   ├── chat.py          # POST /api/chat, /api/chat/stream
+│   │   │   ├── runs.py         # GET/DELETE /api/runs
+│   │   │   └── health.py       # GET /health
+│   │   ├── adapters/
+│   │   │   ├── base.py         # ProviderAdapter ABC
+│   │   │   ├── registry.py    # Auto-discovery + registration
+│   │   │   ├── openai_adapter.py
+│   │   │   ├── anthropic_adapter.py
+│   │   │   ├── openai_compatible_adapter.py  # For local models
+│   │   │   ├── google_adapter.py
+│   │   │   ├── mistral_adapter.py
+│   │   │   ├── groq_adapter.py
+│   │   │   ├── together_adapter.py
+│   │   │   └── azure_openai_adapter.py
+│   │   ├── middleware/
+│   │   │   └── request_logging.py  # Request ID + structured logging
+│   │   └── agentic/
+│   │       ├── tools.py        # Tool registry stub
+│   │       ├── memory.py       # Memory store interface stub
+│   │       └── traces.py      # Trace context stub
+│   ├── tests/
+│   ├── migrations/
+│   ├── pyproject.toml
+│   ├── alembic.ini
+│   └── .env.example
+│
+└── frontend/
+    └── src/
+        ├── main.tsx
+        ├── App.tsx
+        ├── index.css            # Global styles (dark theme)
+        ├── api/
+        │   ├── client.ts        # Typed fetch wrapper
+        │   └── types.ts         # TypeScript interfaces
+        ├── hooks/
+        │   └── useStream.ts     # SSE streaming hook
+        ├── pages/
+        │   ├── Playground.tsx   # Main playground UI
+        │   ├── History.tsx     # Run history table
+        │   └── RunDetail.tsx   # Single run detail + export
+        └── components/
+            ├── Layout.tsx      # App shell with nav
+            ├── StreamOutput.tsx # Streaming text display
+            └── MetadataPanel.tsx # Response metadata grid
 ```
 
 ## Adding a New Provider
