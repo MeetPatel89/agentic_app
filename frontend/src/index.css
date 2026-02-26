@@ -208,14 +208,14 @@ select {
   background: var(--bg-input);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 16px;
-  font-size: 13px;
-  line-height: 1.7;
+  padding: 20px 24px;
+  font-size: 15px;
+  line-height: 1.8;
   min-height: 120px;
   white-space: normal;
   word-break: break-word;
   overflow-y: auto;
-  max-height: 400px;
+  max-height: 680px;
 }
 
 .output-panel.streaming {
@@ -223,7 +223,7 @@ select {
 }
 
 .markdown-output p {
-  margin-bottom: 10px;
+  margin-bottom: 0.85em;
 }
 
 .markdown-output h1,
@@ -232,13 +232,27 @@ select {
 .markdown-output h4,
 .markdown-output h5,
 .markdown-output h6 {
-  margin: 12px 0 8px;
+  margin: 1.4em 0 0.5em;
   line-height: 1.3;
+  font-weight: 600;
+  letter-spacing: -0.01em;
 }
+
+.markdown-output h1 { font-size: 1.5em; }
+.markdown-output h2 { font-size: 1.25em; }
+.markdown-output h3 { font-size: 1.1em; }
 
 .markdown-output ul,
 .markdown-output ol {
-  margin: 8px 0 10px 20px;
+  margin: 0.5em 0 0.85em 1.5em;
+}
+
+.markdown-output li {
+  margin-bottom: 0.3em;
+}
+
+.markdown-output li + li {
+  margin-top: 0.15em;
 }
 
 .markdown-output code {
@@ -263,6 +277,38 @@ select {
   background: transparent;
   border: none;
   padding: 0;
+}
+
+/* Math / KaTeX rendering */
+.markdown-output .katex {
+  color: var(--text);
+  font-size: 1.05em;
+}
+
+.markdown-output .katex-display {
+  margin: 1.4em 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.4em 0;
+}
+
+.markdown-output .katex-display > .katex {
+  font-size: 1.15em;
+}
+
+/* Improve overall document feel */
+.markdown-output {
+  font-size: 15px;
+  line-height: 1.85;
+  color: var(--text);
+}
+
+.markdown-output > *:first-child {
+  margin-top: 0;
+}
+
+.markdown-output > *:last-child {
+  margin-bottom: 0;
 }
 
 .cursor-blink {
