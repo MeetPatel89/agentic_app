@@ -1,5 +1,6 @@
 import ReactMarkdown from "react-markdown";
 import rehypeKatex from "rehype-katex";
+import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 
 interface Props {
@@ -111,9 +112,11 @@ function preprocessLatex(text: string): string {
 
   // 3. Fix spaced single-dollar signs: $ content $ → $content$
   //    remark-math rejects inline math with spaces adjacent to the delimiter.
+  //    The opening $ must be preceded by whitespace or start-of-line to avoid
+  //    matching the *closing* $ of a valid $x$ group and eating text between groups.
   text = text.replace(
-    /(?<!\$)\$(?!\$)\s+((?:[^$\\]|\\.)+?)\s+\$(?!\$)/g,
-    (_, c: string) => `$${c}$`,
+    /(?<=\s|^)\$\s+((?:[^$\\]|\\.)+?)\s+\$(?!\$)/gm,
+    (_, c: string) => ` $${c}$`,
   );
 
   // 4. Wrap bare LaTeX lines / \begin...\end blocks in $$...$$
@@ -133,7 +136,7 @@ export function StreamOutput({ text, isStreaming }: Props) {
       {text ? (
         <div className="markdown-output">
           <ReactMarkdown
-            remarkPlugins={[remarkMath]}
+            remarkPlugins={[remarkGfm, remarkMath]}
             rehypePlugins={[
               [rehypeKatex, { throwOnError: false, strict: false }],
             ]}

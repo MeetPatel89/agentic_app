@@ -255,6 +255,37 @@ select {
   margin-top: 0.15em;
 }
 
+/* Tables rendered via remark-gfm inside the output panel */
+.markdown-output table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1em 0;
+  font-size: 0.9em;
+}
+
+.markdown-output th,
+.markdown-output td {
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  text-align: left;
+}
+
+.markdown-output th {
+  background: rgba(255, 255, 255, 0.04);
+  font-weight: 600;
+}
+
+.markdown-output tr:hover td {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+/* Horizontal rules */
+.markdown-output hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 1.5em 0;
+}
+
 .markdown-output code {
   font-family: var(--font-mono);
   font-size: 12px;
