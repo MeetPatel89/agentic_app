@@ -1,0 +1,25 @@
+---
+description: Enforce efficient async database access patterns
+globs: backend/app/**/*.py
+alwaysApply: false
+---
+
+# Database Efficiency
+
+- Use `AsyncSession` from the project database layer for DB operations.
+- Keep transactions scoped and explicit; commit/rollback intentionally.
+- Default list endpoints to pagination with safe limits.
+- Design query paths to avoid N+1 patterns.
+
+## Required Patterns
+
+- Select only fields needed for response models on hot paths.
+- Keep read/write responsibilities clear and easy to test.
+- Add or use indexed filters for frequent lookup paths.
+- Handle idempotency for retried write operations when applicable.
+
+## Prohibited Patterns
+
+- No unbounded table scans for user-facing list APIs.
+- No DB access from middleware unless strictly necessary.
+- No DB transaction control in router handlers when a service/repository can own it.

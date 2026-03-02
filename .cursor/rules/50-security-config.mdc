@@ -1,0 +1,24 @@
+---
+description: Enforce secure defaults and configuration hygiene
+alwaysApply: true
+---
+
+# Security And Configuration
+
+- Never hardcode credentials, API keys, or secrets.
+- Use environment-driven config and existing project settings patterns.
+- Validate and sanitize all user-provided inputs.
+- Minimize sensitive data retention in logs, errors, and persisted run records.
+
+## Required Patterns
+
+- Prefer least-privilege defaults for new integrations.
+- For new endpoints, consider auth, CORS, and rate-limit implications.
+- Redact secret-like fields before logging or telemetry emission.
+- Keep security checks in server-side code, not only frontend controls.
+
+## Prohibited Patterns
+
+- No committing `.env` values or sample real tokens.
+- No verbose exception output to clients in production paths.
+- No trusting provider/webhook payloads without validation.

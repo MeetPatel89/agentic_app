@@ -1,0 +1,26 @@
+---
+description: Optimize async I/O, concurrency, and timeout behavior
+globs: backend/**/*.py
+alwaysApply: false
+---
+
+# FastAPI Async Performance
+
+- Use `async def` for all request paths that perform I/O.
+- Avoid blocking calls (`time.sleep`, sync HTTP clients, sync DB sessions) in async code.
+- Use bounded concurrency for independent external I/O; avoid unbounded fan-out.
+- Set explicit timeouts for provider/network operations.
+- Use cancellation-safe cleanup for streaming and long-lived tasks.
+
+## Required Patterns
+
+- Prefer shared async clients/resources over per-request initialization.
+- Use retries only for transient failures and bound retry count/backoff.
+- Keep middleware non-blocking and minimal on hot request paths.
+- Preserve `uv`-based tooling and project conventions for backend workflows.
+
+## Prohibited Patterns
+
+- No synchronous SDK calls in adapters or routers.
+- No silent fallback loops that mask latency spikes.
+- No unbounded background tasks created from request handlers.

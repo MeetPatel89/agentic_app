@@ -1,0 +1,24 @@
+---
+description: Require tests for behavior, resilience, and contract safety
+globs: backend/tests/**/*.py
+alwaysApply: false
+---
+
+# Testing Gates
+
+- Any behavior change requires test updates in the same change set.
+- Cover happy path, validation failure, timeout/failure, and edge cases.
+- For streaming features, test event ordering and stream completion behavior.
+- For contract changes, add backward-compatibility assertions or explicit migration notes.
+
+## Performance-Sensitive Paths
+
+- Add focused checks for hot paths where latency or throughput can regress.
+- Prefer deterministic tests (mock provider/network boundaries).
+- Avoid flaky timing-based assertions without tolerance windows.
+
+## Prohibited Patterns
+
+- No merging endpoint or adapter behavior changes without tests.
+- No deleting failing tests to make a change pass.
+- No silently changing API or SSE event shapes without test updates.

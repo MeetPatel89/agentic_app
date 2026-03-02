@@ -1,0 +1,25 @@
+---
+description: Standardize logging, tracing, and resilient failure handling
+globs: backend/app/**/*.py
+alwaysApply: false
+---
+
+# Observability And Reliability
+
+- Use structured logs with request or trace identifiers.
+- Measure latency for DB calls and external provider calls.
+- Surface actionable errors; avoid swallowing exceptions.
+- Keep request-logging middleware lightweight and non-blocking.
+
+## Required Patterns
+
+- Include enough context for debugging without exposing sensitive data.
+- Ensure retries, timeouts, and fallback behavior are explicit in code.
+- Propagate cancellation and timeout context to downstream calls where possible.
+- Fail predictably with stable error contracts.
+
+## Prohibited Patterns
+
+- No bare `except` blocks that hide root cause.
+- No logging of secrets, tokens, or full private payloads.
+- No noisy per-token logging on hot streaming loops.
