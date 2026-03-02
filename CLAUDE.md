@@ -90,3 +90,51 @@ Streaming uses Server-Sent Events (SSE). Every request (streaming or not) is per
 - **Package manager:** Backend uses `uv` (not pip/poetry). Frontend uses `npm`.
 - **Linting:** Backend uses `ruff` (not black/flake8). Frontend uses ESLint + Prettier.
 - **Tests:** `asyncio_mode = "auto"` is set — no need for `@pytest.mark.asyncio`. Use the `client` and `db_session` fixtures from `conftest.py`.
+
+## Engineering Standards
+
+### Router Discipline
+
+- Routers must stay thin: validate input, call adapters/services, shape the HTTP response. No business logic.
+- No direct provider SDK calls from `routers/` — all provider interaction goes through adapters.
+- No raw SQL or DB session orchestration in route handlers — use repository/service functions.
+- Keep API schemas backward-compatible. Do not change endpoint or SSE event shapes without explicit approval.
+- Map errors to consistent HTTP status codes and response envelopes. Validate inputs early.
+
+### Async Safety
+
+- Never use blocking calls in async code (`time.sleep`, sync HTTP clients, sync DB sessions).
+- Set explicit timeouts on all provider/network operations.
+- Use bounded concurrency for parallel external I/O — no unbounded fan-out.
+- Prefer shared async clients/resources over per-request initialization.
+- Use cancellation-safe cleanup for streaming and long-lived tasks.
+
+### Database Patterns
+
+- Always paginate list endpoints with safe default limits — no unbounded table scans.
+- Avoid N+1 query patterns. Select only the fields needed for the response on hot paths.
+- Keep transactions scoped and explicit; commit/rollback intentionally.
+- DB transaction control belongs in service/repository layers, not in routers.
+
+### Error Handling & Observability
+
+- No bare `except` blocks — always catch specific exceptions and surface actionable errors.
+- Use structured logs with request or trace identifiers for debugging context.
+- Never log secrets, API keys, tokens, or full private payloads.
+- No noisy per-token logging on hot streaming loops.
+- No verbose exception details in responses to clients (production paths).
+
+### Security
+
+- Never hardcode credentials or API keys. Use environment-driven config via existing patterns.
+- Validate and sanitize all user-provided inputs on the server side.
+- Redact secret-like fields before logging or telemetry emission.
+- For new endpoints, consider auth, CORS, and rate-limit implications.
+
+### Testing Requirements
+
+- Every behavior change requires corresponding test updates in the same changeset.
+- Cover: happy path, validation failure, timeout/error, and edge cases.
+- For streaming features, test SSE event ordering and stream completion behavior.
+- Mock provider and network boundaries for deterministic tests — avoid flaky timing assertions.
+- Never delete failing tests to make a change pass.
