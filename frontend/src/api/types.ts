@@ -77,6 +77,8 @@ export interface StreamMetaEvent {
 export interface StreamFinalEvent {
   type: "final";
   response: NormalizedChatResponse;
+  conversation_id?: string;
+  run_id?: string;
 }
 
 export interface StreamErrorEvent {
@@ -94,4 +96,63 @@ export interface HealthResponse {
 export interface ProviderModelsResponse {
   provider: string;
   models: string[];
+}
+
+// ── Conversation types ─────────────────────────────────────────────────────
+
+export interface ConversationTurnRequest {
+  conversation_id?: string;
+  provider: string;
+  model: string;
+  message: string;
+  system_prompt?: string;
+  temperature: number;
+  max_tokens: number;
+  provider_options: Record<string, unknown>;
+}
+
+export interface TurnResponse {
+  conversation_id: string;
+  run_id: string;
+  response: NormalizedChatResponse;
+  latency_ms: number;
+}
+
+export interface ConversationMessage {
+  id: string;
+  role: string;
+  content: string;
+  ordinal: number;
+  created_at: string;
+  run_id: string | null;
+  metadata_json: string | null;
+}
+
+export interface ConversationSummary {
+  id: string;
+  created_at: string;
+  updated_at: string;
+  title: string | null;
+  provider: string;
+  model: string;
+  message_count: number;
+}
+
+export interface ConversationDetail {
+  id: string;
+  created_at: string;
+  updated_at: string;
+  title: string | null;
+  provider: string;
+  model: string;
+  system_prompt: string | null;
+  config_json: string | null;
+  messages: ConversationMessage[];
+}
+
+export interface PaginatedConversations {
+  items: ConversationSummary[];
+  total: number;
+  page: number;
+  per_page: number;
 }

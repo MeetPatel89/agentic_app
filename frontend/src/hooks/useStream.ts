@@ -1,12 +1,19 @@
 import { useCallback, useRef, useState } from "react";
-import type { ChatRequest, NormalizedChatResponse, StreamEvent } from "../api/types";
+import type {
+  ChatRequest,
+  ConversationTurnRequest,
+  NormalizedChatResponse,
+  StreamEvent,
+} from "../api/types";
 
 interface UseStreamReturn {
   streamingText: string;
   isStreaming: boolean;
   error: string | null;
   finalResponse: NormalizedChatResponse | null;
+  conversationId: string | null;
   startStream: (req: ChatRequest) => void;
+  startTurnStream: (req: ConversationTurnRequest) => void;
   abort: () => void;
 }
 
@@ -15,6 +22,7 @@ export function useStream(): UseStreamReturn {
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [finalResponse, setFinalResponse] = useState<NormalizedChatResponse | null>(null);
+  const [conversationId, setConversationId] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   const abort = useCallback(() => {
@@ -23,83 +31,108 @@ export function useStream(): UseStreamReturn {
     setIsStreaming(false);
   }, []);
 
-  const startStream = useCallback((req: ChatRequest) => {
-    abort();
-    setStreamingText("");
-    setError(null);
-    setFinalResponse(null);
-    setIsStreaming(true);
+  const runStream = useCallback(
+    (url: string, body: unknown) => {
+      abort();
+      setStreamingText("");
+      setError(null);
+      setFinalResponse(null);
+      setIsStreaming(true);
 
-    const controller = new AbortController();
-    abortRef.current = controller;
+      const controller = new AbortController();
+      abortRef.current = controller;
 
-    (async () => {
-      try {
-        const res = await fetch("/api/chat/stream", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(req),
-          signal: controller.signal,
-        });
+      (async () => {
+        try {
+          const res = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+            signal: controller.signal,
+          });
 
-        if (!res.ok) {
-          const body = await res.json().catch(() => ({ detail: res.statusText }));
-          throw new Error(body.detail || `HTTP ${res.status}`);
-        }
+          if (!res.ok) {
+            const errBody = await res.json().catch(() => ({ detail: res.statusText }));
+            throw new Error(errBody.detail || `HTTP ${res.status}`);
+          }
 
-        const reader = res.body?.getReader();
-        if (!reader) throw new Error("No response body");
+          const reader = res.body?.getReader();
+          if (!reader) throw new Error("No response body");
 
-        const decoder = new TextDecoder();
-        let buffer = "";
+          const decoder = new TextDecoder();
+          let buffer = "";
 
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
 
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split("\n");
-          buffer = lines.pop() ?? "";
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split("\n");
+            buffer = lines.pop() ?? "";
 
-          let currentEventType: string | null = null;
-          for (const line of lines) {
-            if (line.startsWith("event: ")) {
-              currentEventType = line.slice(7).trim();
-            } else if (line.startsWith("data: ") && currentEventType) {
-              try {
-                const event = JSON.parse(line.slice(6)) as StreamEvent;
-                switch (currentEventType) {
-                  case "delta":
-                    if (event.type === "delta") {
-                      setStreamingText((prev) => prev + event.text);
-                    }
-                    break;
-                  case "final":
-                    if (event.type === "final") {
-                      setFinalResponse(event.response);
-                    }
-                    break;
-                  case "error":
-                    if (event.type === "error") {
-                      setError(event.message);
-                    }
-                    break;
+            let currentEventType: string | null = null;
+            for (const line of lines) {
+              if (line.startsWith("event: ")) {
+                currentEventType = line.slice(7).trim();
+              } else if (line.startsWith("data: ") && currentEventType) {
+                try {
+                  const event = JSON.parse(line.slice(6)) as StreamEvent;
+                  switch (currentEventType) {
+                    case "delta":
+                      if (event.type === "delta") {
+                        setStreamingText((prev) => prev + event.text);
+                      }
+                      break;
+                    case "final":
+                      if (event.type === "final") {
+                        setFinalResponse(event.response);
+                        if (event.conversation_id) {
+                          setConversationId(event.conversation_id);
+                        }
+                      }
+                      break;
+                    case "error":
+                      if (event.type === "error") {
+                        setError(event.message);
+                      }
+                      break;
+                  }
+                } catch {
+                  // skip malformed JSON
                 }
-              } catch {
-                // skip malformed JSON
+                currentEventType = null;
               }
-              currentEventType = null;
             }
           }
+        } catch (err) {
+          if (err instanceof DOMException && err.name === "AbortError") return;
+          setError(err instanceof Error ? err.message : "Stream failed");
+        } finally {
+          setIsStreaming(false);
         }
-      } catch (err) {
-        if (err instanceof DOMException && err.name === "AbortError") return;
-        setError(err instanceof Error ? err.message : "Stream failed");
-      } finally {
-        setIsStreaming(false);
-      }
-    })();
-  }, [abort]);
+      })();
+    },
+    [abort],
+  );
 
-  return { streamingText, isStreaming, error, finalResponse, startStream, abort };
+  const startStream = useCallback(
+    (req: ChatRequest) => runStream("/api/chat/stream", req),
+    [runStream],
+  );
+
+  const startTurnStream = useCallback(
+    (req: ConversationTurnRequest) => runStream("/api/chat/turn/stream", req),
+    [runStream],
+  );
+
+  return {
+    streamingText,
+    isStreaming,
+    error,
+    finalResponse,
+    conversationId,
+    startStream,
+    startTurnStream,
+    abort,
+  };
 }

@@ -54,6 +54,8 @@ class StreamMeta(BaseModel):
 class StreamFinal(BaseModel):
     type: str = "final"
     response: NormalizedChatResponse
+    conversation_id: str | None = None
+    run_id: str | None = None
 
 
 class StreamError(BaseModel):
@@ -84,6 +86,7 @@ class RunDetail(RunSummary):
     tags: str | None = None
     trace_id: str | None = None
     parent_run_id: str | None = None
+    conversation_id: str | None = None
 
     model_config = {"from_attributes": True}
 
@@ -93,3 +96,67 @@ class PaginatedRuns(BaseModel):
     total: int
     page: int
     per_page: int
+
+
+# ── Conversation schemas ────────────────────────────────────────────────────
+class ConversationTurnRequest(BaseModel):
+    conversation_id: str | None = None
+    provider: str
+    model: str
+    message: str
+    system_prompt: str | None = None
+    temperature: float = 0.7
+    max_tokens: int = 1024
+    provider_options: dict[str, Any] = Field(default_factory=dict)
+
+
+class ConversationMessageSchema(BaseModel):
+    id: str
+    role: str
+    content: str
+    ordinal: int
+    created_at: datetime
+    run_id: str | None = None
+    metadata_json: str | None = None
+
+    model_config = {"from_attributes": True}
+
+
+class ConversationSummary(BaseModel):
+    id: str
+    created_at: datetime
+    updated_at: datetime
+    title: str | None = None
+    provider: str
+    model: str
+    message_count: int = 0
+
+    model_config = {"from_attributes": True}
+
+
+class ConversationDetail(BaseModel):
+    id: str
+    created_at: datetime
+    updated_at: datetime
+    title: str | None = None
+    provider: str
+    model: str
+    system_prompt: str | None = None
+    config_json: str | None = None
+    messages: list[ConversationMessageSchema] = []
+
+    model_config = {"from_attributes": True}
+
+
+class PaginatedConversations(BaseModel):
+    items: list[ConversationSummary]
+    total: int
+    page: int
+    per_page: int
+
+
+class TurnResponse(BaseModel):
+    conversation_id: str
+    run_id: str
+    response: NormalizedChatResponse
+    latency_ms: float

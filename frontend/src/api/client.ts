@@ -1,10 +1,14 @@
 import type {
   ChatApiResponse,
   ChatRequest,
+  ConversationDetail,
+  ConversationTurnRequest,
   HealthResponse,
+  PaginatedConversations,
   PaginatedRuns,
   ProviderModelsResponse,
   RunDetail,
+  TurnResponse,
 } from "./types";
 
 const BASE = "";
@@ -26,12 +30,21 @@ export const api = {
   listModels: (provider: string) =>
     request<ProviderModelsResponse>(`/api/providers/${encodeURIComponent(provider)}/models`),
 
+  // Legacy single-shot
   chat: (req: ChatRequest) =>
     request<ChatApiResponse>("/api/chat", {
       method: "POST",
       body: JSON.stringify(req),
     }),
 
+  // Turn-based conversation
+  chatTurn: (req: ConversationTurnRequest) =>
+    request<TurnResponse>("/api/chat/turn", {
+      method: "POST",
+      body: JSON.stringify(req),
+    }),
+
+  // Runs
   listRuns: (page = 1, perPage = 20) =>
     request<PaginatedRuns>(`/api/runs?page=${page}&per_page=${perPage}`),
 
@@ -39,4 +52,20 @@ export const api = {
 
   deleteRun: (id: string) =>
     request<{ deleted: string }>(`/api/runs/${id}`, { method: "DELETE" }),
+
+  // Conversations
+  listConversations: (page = 1, perPage = 20) =>
+    request<PaginatedConversations>(`/api/conversations?page=${page}&per_page=${perPage}`),
+
+  getConversation: (id: string) =>
+    request<ConversationDetail>(`/api/conversations/${id}`),
+
+  deleteConversation: (id: string) =>
+    request<{ deleted: string }>(`/api/conversations/${id}`, { method: "DELETE" }),
+
+  updateConversation: (id: string, body: { title?: string }) =>
+    request<{ id: string; title: string }>(`/api/conversations/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
 };

@@ -11,7 +11,7 @@ from app.config import get_settings
 from app.database import engine
 from app.middleware.request_logging import RequestLoggingMiddleware
 from app.models import Base
-from app.routers import chat, health, runs
+from app.routers import chat, conversations, health, runs
 
 
 @asynccontextmanager
@@ -43,3 +43,4 @@ app.add_middleware(RequestLoggingMiddleware)
 app.include_router(health.router)
 app.include_router(chat.router)
 app.include_router(runs.router)
+app.include_router(conversations.router)
