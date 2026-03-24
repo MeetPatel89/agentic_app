@@ -4,10 +4,17 @@ import type {
   ConversationDetail,
   ConversationTurnRequest,
   HealthResponse,
+  NL2SQLRequest,
+  NL2SQLResponse,
   PaginatedConversations,
   PaginatedRuns,
   ProviderModelsResponse,
   RunDetail,
+  SQLExecuteRequest,
+  SQLExecuteResponse,
+  SQLValidateRequest,
+  SQLValidationResult,
+  ToolListResponse,
   TurnResponse,
 } from "./types";
 
@@ -27,6 +34,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   health: () => request<HealthResponse>("/health"),
+  listTools: () => request<ToolListResponse>("/api/tools"),
   listModels: (provider: string) =>
     request<ProviderModelsResponse>(`/api/providers/${encodeURIComponent(provider)}/models`),
 
@@ -67,5 +75,24 @@ export const api = {
     request<{ id: string; title: string }>(`/api/conversations/${id}`, {
       method: "PATCH",
       body: JSON.stringify(body),
+    }),
+
+  // QueryLab (NL-to-SQL)
+  generateSQL: (req: NL2SQLRequest) =>
+    request<NL2SQLResponse>("/api/querylab/generate", {
+      method: "POST",
+      body: JSON.stringify(req),
+    }),
+
+  validateSQL: (req: SQLValidateRequest) =>
+    request<SQLValidationResult>("/api/querylab/validate", {
+      method: "POST",
+      body: JSON.stringify(req),
+    }),
+
+  executeSQL: (req: SQLExecuteRequest) =>
+    request<SQLExecuteResponse>("/api/querylab/execute", {
+      method: "POST",
+      body: JSON.stringify(req),
     }),
 };

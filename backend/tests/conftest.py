@@ -4,6 +4,7 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from app.agentic.tools import register_default_tools
 from app.database import get_db
 from app.main import app
 from app.models import Base
@@ -30,6 +31,7 @@ async def client(db_session: AsyncSession):
         yield db_session
 
     app.dependency_overrides[get_db] = _override_db
+    register_default_tools()
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac

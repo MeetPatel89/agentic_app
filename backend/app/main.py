@@ -7,11 +7,13 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.adapters.registry import init_registry
+from app.agentic.tools import register_default_tools
 from app.config import get_settings
 from app.database import engine
 from app.middleware.request_logging import RequestLoggingMiddleware
 from app.models import Base
-from app.routers import chat, conversations, health, runs
+from app.nl2sql.router import router as nl2sql_router
+from app.routers import chat, conversations, health, runs, tools
 
 
 @asynccontextmanager
@@ -25,6 +27,7 @@ async def lifespan(app: FastAPI):  # type: ignore[no-untyped-def]
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     init_registry()
+    register_default_tools()
     yield
 
 
@@ -44,3 +47,5 @@ app.include_router(health.router)
 app.include_router(chat.router)
 app.include_router(runs.router)
 app.include_router(conversations.router)
+app.include_router(tools.router)
+app.include_router(nl2sql_router)

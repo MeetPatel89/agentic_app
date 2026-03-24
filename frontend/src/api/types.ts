@@ -9,7 +9,7 @@ export interface ChatRequest {
   provider: string;
   model: string;
   messages: Message[];
-  temperature: number;
+  temperature: number | null;
   max_tokens: number;
   provider_options: Record<string, unknown>;
 }
@@ -98,7 +98,21 @@ export interface ProviderModelsResponse {
   models: string[];
 }
 
+// ── Tool types ────────────────────────────────────────────────────────────
+
+export interface ToolDefinition {
+  name: string;
+  description: string;
+  parameters_schema: Record<string, unknown>;
+}
+
+export interface ToolListResponse {
+  tools: ToolDefinition[];
+}
+
 // ── Conversation types ─────────────────────────────────────────────────────
+
+export type ToolMode = "off" | "auto" | "manual";
 
 export interface ConversationTurnRequest {
   conversation_id?: string;
@@ -106,9 +120,11 @@ export interface ConversationTurnRequest {
   model: string;
   message: string;
   system_prompt?: string;
-  temperature: number;
+  temperature: number | null;
   max_tokens: number;
   provider_options: Record<string, unknown>;
+  tool_mode?: ToolMode;
+  tool_names?: string[];
 }
 
 export interface TurnResponse {
@@ -155,4 +171,71 @@ export interface PaginatedConversations {
   total: number;
   page: number;
   per_page: number;
+}
+
+// ── QueryLab (NL-to-SQL) types ─────────────────────────────────────────────
+
+export type SQLDialect = "postgresql" | "tsql" | "mysql" | "sqlite" | "bigquery" | "snowflake";
+
+export interface NL2SQLRequest {
+  provider: string;
+  model: string;
+  natural_language: string;
+  dialect: SQLDialect;
+  system_prompt?: string;
+  temperature: number | null;
+  max_tokens: number;
+  sandbox_ddl?: string;
+  provider_options: Record<string, unknown>;
+}
+
+export interface SQLValidationResult {
+  is_valid: boolean;
+  syntax_errors: string[];
+  transpiled_sql: string | null;
+  sandbox_execution_success: boolean | null;
+  sandbox_error: string | null;
+}
+
+export interface NL2SQLResponse {
+  generated_sql: string;
+  explanation: string;
+  dialect: SQLDialect;
+  validation: SQLValidationResult;
+  usage: Record<string, number | null>;
+  run_id: string | null;
+  latency_ms: number | null;
+}
+
+export interface SQLValidateRequest {
+  sql: string;
+  dialect: SQLDialect;
+  sandbox_ddl?: string;
+}
+
+export interface SQLExecuteRequest {
+  sql: string;
+  dialect: SQLDialect;
+  connection_string: string;
+  timeout_seconds?: number;
+  max_rows?: number;
+}
+
+export interface SQLExecuteResponse {
+  columns: string[];
+  rows: unknown[][];
+  row_count: number;
+  execution_time_ms: number;
+  truncated: boolean;
+}
+
+export interface QueryLabStreamFinalEvent {
+  type: "querylab_final";
+  generated_sql: string;
+  explanation: string;
+  dialect: SQLDialect;
+  validation: SQLValidationResult;
+  usage: Record<string, number | null>;
+  run_id: string | null;
+  latency_ms: number | null;
 }

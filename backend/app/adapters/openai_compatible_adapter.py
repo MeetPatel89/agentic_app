@@ -51,11 +51,14 @@ class OpenAICompatibleAdapter(ProviderAdapter):
 
     async def chat(self, req: ChatRequest) -> NormalizedChatResponse:
         client = self._get_client()
+        temp_kwargs: dict = {}
+        if req.temperature is not None:
+            temp_kwargs["temperature"] = req.temperature
         resp = await client.chat.completions.create(
             model=req.model,
             messages=self._build_messages(req),  # type: ignore[arg-type]
-            temperature=req.temperature,
             max_tokens=req.max_tokens,
+            **temp_kwargs,
             **req.provider_options,
         )
         choice = resp.choices[0]
@@ -76,12 +79,15 @@ class OpenAICompatibleAdapter(ProviderAdapter):
     async def stream_chat(self, req: ChatRequest) -> AsyncIterator[StreamEvent]:
         client = self._get_client()
         try:
+            temp_kwargs: dict = {}
+            if req.temperature is not None:
+                temp_kwargs["temperature"] = req.temperature
             stream = await client.chat.completions.create(
                 model=req.model,
                 messages=self._build_messages(req),  # type: ignore[arg-type]
-                temperature=req.temperature,
                 max_tokens=req.max_tokens,
                 stream=True,
+                **temp_kwargs,
                 **req.provider_options,
             )
             yield StreamMeta(provider=self.name, model=req.model)

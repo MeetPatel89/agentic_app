@@ -7,6 +7,9 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      (function(){var t=localStorage.getItem('llm-router-theme');if(t==='light'||t==='blue'||t==='dark')document.documentElement.setAttribute('data-theme',t)})();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

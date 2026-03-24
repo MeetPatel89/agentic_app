@@ -100,12 +100,17 @@ class ConversationService:
         *,
         conversation: Conversation,
         new_user_message: str,
-        temperature: float = 0.7,
+        provider: str | None = None,
+        model: str | None = None,
+        temperature: float | None = 0.7,
         max_tokens: int = 1024,
         provider_options: dict | None = None,
         window_size: int = DEFAULT_WINDOW_SIZE,
     ) -> ChatRequest:
         """Assemble a full ChatRequest from conversation history + new message.
+
+        *provider* and *model* override the conversation defaults so callers
+        can switch provider/model mid-conversation.
 
         Extension point for Approach 3: when self._memory_store is set,
         retrieved memories/summaries can be prepended to the message list
@@ -131,8 +136,8 @@ class ConversationService:
         messages.append(Message(role="user", content=new_user_message))
 
         return ChatRequest(
-            provider=conversation.provider,
-            model=conversation.model,
+            provider=provider or conversation.provider,
+            model=model or conversation.model,
             messages=messages,
             temperature=temperature,
             max_tokens=max_tokens,

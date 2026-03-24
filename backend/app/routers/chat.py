@@ -10,6 +10,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.registry import get_adapter
+from app.agentic.tools import tool_registry
 from app.agentic.traces import new_trace
 from app.database import get_db
 from app.models import Run
@@ -24,6 +25,7 @@ from app.schemas import (
     TurnResponse,
 )
 from app.services.conversation import conversation_service
+from app.services.tool_executor import ToolExecutor
 
 logger = logging.getLogger("llm_router")
 
@@ -72,7 +74,11 @@ async def chat(req: ChatRequest, db: AsyncSession = Depends(get_db)) -> dict:
 
     start = time.perf_counter()
     try:
-        response = await adapter.chat(req)
+        if req.tools:
+            executor = ToolExecutor(tool_registry)
+            response = await executor.execute_with_tools(adapter, req)
+        else:
+            response = await adapter.chat(req)
         latency = (time.perf_counter() - start) * 1000
         run = await _persist_run(db, req, response, None, latency)
         await db.commit()
@@ -92,6 +98,8 @@ async def chat(req: ChatRequest, db: AsyncSession = Depends(get_db)) -> dict:
 
 @router.post("/chat/stream")
 async def chat_stream(req: ChatRequest, db: AsyncSession = Depends(get_db)) -> StreamingResponse:
+    if req.tools:
+        raise HTTPException(status_code=400, detail="Tool calling is not supported with streaming yet")
     adapter = get_adapter(req.provider)
     if not adapter:
         raise HTTPException(status_code=400, detail=f"Provider '{req.provider}' not available")
@@ -152,20 +160,36 @@ async def _prepare_turn(
             system_prompt=req.system_prompt,
         )
 
-    await svc.append_message(db, conversation_id=conv.id, role="user", content=req.message)
-
     chat_req = await svc.build_chat_request(
         db,
         conversation=conv,
         new_user_message=req.message,
+        provider=req.provider,
+        model=req.model,
         temperature=req.temperature,
         max_tokens=req.max_tokens,
         provider_options=req.provider_options,
     )
 
-    adapter = get_adapter(conv.provider)
+    await svc.append_message(db, conversation_id=conv.id, role="user", content=req.message)
+
+    # Resolve tools based on tool_mode
+    tool_defs: list = []
+    if req.tool_mode == "auto":
+        tool_defs = tool_registry.list_request_schemas()
+    elif req.tool_mode == "manual" and req.tool_names:
+        for name in req.tool_names:
+            tool = tool_registry.get(name)
+            if tool is None:
+                raise HTTPException(status_code=400, detail=f"Unknown tool: '{name}'")
+            tool_defs.append(tool.as_request_schema())
+
+    if tool_defs:
+        chat_req = chat_req.model_copy(update={"tools": tool_defs, "tool_choice": "auto"})
+
+    adapter = get_adapter(req.provider)
     if not adapter:
-        raise HTTPException(status_code=400, detail=f"Provider '{conv.provider}' not available")
+        raise HTTPException(status_code=400, detail=f"Provider '{req.provider}' not available")
 
     trace = new_trace()
     parent_run_id = await svc.get_last_run_id(db, conv.id)
@@ -182,7 +206,11 @@ async def chat_turn(
 
     start = time.perf_counter()
     try:
-        response = await adapter.chat(chat_req)
+        if chat_req.tools:
+            executor = ToolExecutor(tool_registry)
+            response = await executor.execute_with_tools(adapter, chat_req)
+        else:
+            response = await adapter.chat(chat_req)
         latency = (time.perf_counter() - start) * 1000
 
         run = await _persist_run(
@@ -222,6 +250,8 @@ async def chat_turn(
 async def chat_turn_stream(
     req: ConversationTurnRequest, db: AsyncSession = Depends(get_db)
 ) -> StreamingResponse:
+    if req.tool_mode == "auto" or (req.tool_mode == "manual" and req.tool_names):
+        raise HTTPException(status_code=400, detail="Tool calling is not supported with streaming")
     conv, chat_req, adapter, trace, parent_run_id = await _prepare_turn(db, req)
     svc = conversation_service
 

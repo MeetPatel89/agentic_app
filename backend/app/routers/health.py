@@ -25,5 +25,4 @@ async def provider_models(provider: str) -> dict:
         models = await adapter.list_models()
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Failed to list models for '{provider}': {exc}") from exc
-
     return {"provider": provider, "models": models}

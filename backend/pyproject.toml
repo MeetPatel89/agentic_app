@@ -15,9 +15,14 @@ dependencies = [
     "anthropic>=0.43",
     "httpx>=0.28",
     "sse-starlette>=2.2",
+    "sqlglot>=26",
 ]
 
 [project.optional-dependencies]
+db-drivers = [
+    "asyncpg>=0.30",
+    "aiomysql>=0.2",
+]
 dev = [
     "pytest>=8.3",
     "pytest-asyncio>=0.25",
@@ -36,3 +41,8 @@ select = ["E", "F", "I", "UP"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 pythonpath = ["."]
+
+[dependency-groups]
+dev = [
+    "requests>=2.32.5",
+]

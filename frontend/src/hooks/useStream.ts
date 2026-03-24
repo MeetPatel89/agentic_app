@@ -15,6 +15,7 @@ interface UseStreamReturn {
   startStream: (req: ChatRequest) => void;
   startTurnStream: (req: ConversationTurnRequest) => void;
   abort: () => void;
+  reset: () => void;
 }
 
 export function useStream(): UseStreamReturn {
@@ -24,16 +25,32 @@ export function useStream(): UseStreamReturn {
   const [finalResponse, setFinalResponse] = useState<NormalizedChatResponse | null>(null);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const textBufferRef = useRef("");
+  const rafIdRef = useRef<number | null>(null);
 
   const abort = useCallback(() => {
     abortRef.current?.abort();
     abortRef.current = null;
+    if (rafIdRef.current !== null) {
+      cancelAnimationFrame(rafIdRef.current);
+      rafIdRef.current = null;
+    }
     setIsStreaming(false);
   }, []);
+
+  const reset = useCallback(() => {
+    abort();
+    textBufferRef.current = "";
+    setStreamingText("");
+    setError(null);
+    setFinalResponse(null);
+    setConversationId(null);
+  }, [abort]);
 
   const runStream = useCallback(
     (url: string, body: unknown) => {
       abort();
+      textBufferRef.current = "";
       setStreamingText("");
       setError(null);
       setFinalResponse(null);
@@ -80,7 +97,13 @@ export function useStream(): UseStreamReturn {
                   switch (currentEventType) {
                     case "delta":
                       if (event.type === "delta") {
-                        setStreamingText((prev) => prev + event.text);
+                        textBufferRef.current += event.text;
+                        if (rafIdRef.current === null) {
+                          rafIdRef.current = requestAnimationFrame(() => {
+                            setStreamingText(textBufferRef.current);
+                            rafIdRef.current = null;
+                          });
+                        }
                       }
                       break;
                     case "final":
@@ -108,6 +131,11 @@ export function useStream(): UseStreamReturn {
           if (err instanceof DOMException && err.name === "AbortError") return;
           setError(err instanceof Error ? err.message : "Stream failed");
         } finally {
+          if (rafIdRef.current !== null) {
+            cancelAnimationFrame(rafIdRef.current);
+            rafIdRef.current = null;
+          }
+          setStreamingText(textBufferRef.current);
           setIsStreaming(false);
         }
       })();
@@ -134,5 +162,6 @@ export function useStream(): UseStreamReturn {
     startStream,
     startTurnStream,
     abort,
+    reset,
   };
 }

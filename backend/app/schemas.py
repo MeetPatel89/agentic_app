@@ -1,17 +1,41 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
+
+
+# ── Tool-calling primitives ─────────────────────────────────────────────────
+class ToolCallFunction(BaseModel):
+    name: str
+    arguments: str  # JSON-encoded string
+
+
+class ToolCall(BaseModel):
+    id: str
+    type: str = "function"
+    function: ToolCallFunction
+
+
+class ToolFunctionDefinition(BaseModel):
+    name: str
+    description: str
+    parameters: dict[str, Any]  # JSON Schema object
+
+
+class ToolDefinitionRequest(BaseModel):
+    type: str = "function"
+    function: ToolFunctionDefinition
 
 
 # ── Messages ────────────────────────────────────────────────────────────────
 class Message(BaseModel):
     role: str  # system | user | assistant | tool
-    content: str
+    content: str | None = None
     name: str | None = None
     tool_call_id: str | None = None
+    tool_calls: list[ToolCall] | None = None
 
 
 # ── Chat Request ────────────────────────────────────────────────────────────
@@ -19,8 +43,10 @@ class ChatRequest(BaseModel):
     provider: str
     model: str
     messages: list[Message]
-    temperature: float = 0.7
+    temperature: float | None = 0.7
     max_tokens: int = 1024
+    tools: list[ToolDefinitionRequest] | None = None
+    tool_choice: str | None = None
     provider_options: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -36,6 +62,7 @@ class NormalizedChatResponse(BaseModel):
     finish_reason: str | None = None
     provider_response_id: str | None = None
     usage: UsageInfo = Field(default_factory=UsageInfo)
+    tool_calls: list[ToolCall] | None = None
     raw: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -105,9 +132,11 @@ class ConversationTurnRequest(BaseModel):
     model: str
     message: str
     system_prompt: str | None = None
-    temperature: float = 0.7
+    temperature: float | None = 0.7
     max_tokens: int = 1024
     provider_options: dict[str, Any] = Field(default_factory=dict)
+    tool_mode: Literal["off", "auto", "manual"] = "off"
+    tool_names: list[str] | None = None
 
 
 class ConversationMessageSchema(BaseModel):

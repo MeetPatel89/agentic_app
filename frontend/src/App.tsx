@@ -2,6 +2,7 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Layout } from "./components/Layout";
 import { History } from "./pages/History";
 import { Playground } from "./pages/Playground";
+import { QueryLab } from "./pages/QueryLab";
 import { RunDetail } from "./pages/RunDetail";
 
 export default function App() {
@@ -10,6 +11,7 @@ export default function App() {
       <Layout>
         <Routes>
           <Route path="/" element={<Playground />} />
+          <Route path="/querylab" element={<QueryLab />} />
           <Route path="/history" element={<History />} />
           <Route path="/runs/:id" element={<RunDetail />} />
         </Routes>
