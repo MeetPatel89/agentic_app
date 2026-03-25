@@ -22,6 +22,8 @@ dependencies = [
 db-drivers = [
     "asyncpg>=0.30",
     "aiomysql>=0.2",
+    "aioodbc>=0.5",
+    "pyodbc>=5.2",
 ]
 dev = [
     "pytest>=8.3",

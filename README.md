@@ -6,7 +6,7 @@ An extensible agentic LLM router and playground with a React + TypeScript fronte
 
 - **Multi-provider support**: OpenAI, Anthropic, Google Gemini, Mistral, Groq, Together, Azure OpenAI, and any OpenAI-compatible local endpoint (vLLM, Ollama, LM Studio)
 - **Streaming output** via Server-Sent Events
-- **Run history** with SQLite persistence, pagination, and JSON export
+- **Run history** with SQLAlchemy-backed persistence (SQLite, PostgreSQL, Azure SQL), pagination, and JSON export
 - **Normalized responses** across all providers
 - **Extensible architecture** with stubbed tool calling, memory stores, and trace support for future agentic features
 
@@ -35,7 +35,8 @@ uv sync
 uv run uvicorn app.main:app --reload --port 8000
 ```
 
-The backend auto-creates the SQLite database on first startup.
+By default, the backend auto-creates schema on startup (`AUTO_CREATE_SCHEMA=true`).
+For production, prefer `AUTO_CREATE_SCHEMA=false` and run Alembic migrations.
 
 ### 2. Frontend Setup
 
@@ -68,6 +69,9 @@ uv run pytest -v
 | `GET` | `/api/runs?page=1&per_page=20` | List runs (paginated) |
 | `GET` | `/api/runs/{id}` | Run detail |
 | `DELETE` | `/api/runs/{id}` | Delete a run |
+| `GET` | `/api/dev/db/tables` | Developer DB table list (when enabled) |
+| `GET` | `/api/dev/db/table/{name}` | Developer DB table schema (when enabled) |
+| `POST` | `/api/dev/db/query` | Developer read-only SQL query (when enabled) |
 
 ## Sample curl Commands
 
@@ -108,6 +112,38 @@ curl -N -X POST http://localhost:8000/api/chat/stream \
 ### List runs
 ```bash
 curl http://localhost:8000/api/runs
+```
+
+## Database Configuration
+
+Set `DATABASE_URL` in `backend/.env`:
+
+- SQLite (default): `sqlite+aiosqlite:///./llm_router.db`
+- PostgreSQL: `postgresql+asyncpg://user:password@localhost:5432/llm_router`
+- Azure SQL: `mssql+aioodbc://user:password@server.database.windows.net:1433/llm_router?driver=ODBC+Driver+18+for+SQL+Server&Encrypt=yes&TrustServerCertificate=no`
+
+Related settings:
+
+- `AUTO_CREATE_SCHEMA=true|false` (default `true`)
+- `DEV_DB_TOOLS_ENABLED=true|false` (default `false`)
+- `DEV_DB_TOOLS_REQUIRE_LOCALHOST=true|false` (default `true`)
+
+## Developer DB Debugging
+
+### CLI (read-only)
+
+```bash
+cd backend
+DEV_DB_TOOLS_ENABLED=true uv run python scripts/dev_db_query.py tables
+DEV_DB_TOOLS_ENABLED=true uv run python scripts/dev_db_query.py describe runs
+DEV_DB_TOOLS_ENABLED=true uv run python scripts/dev_db_query.py query "SELECT id, provider, model FROM runs ORDER BY created_at DESC LIMIT 5"
+```
+
+You can target another database explicitly:
+
+```bash
+DEV_DB_TOOLS_ENABLED=true uv run python scripts/dev_db_query.py tables \
+  --connection-string "postgresql+asyncpg://user:password@localhost:5432/llm_router"
 ```
 
 ## Project Structure

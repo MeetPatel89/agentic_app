@@ -11,9 +11,10 @@ from app.agentic.tools import register_default_tools
 from app.config import get_settings
 from app.database import engine
 from app.middleware.request_logging import RequestLoggingMiddleware
+from app.migrations import run_migrations_async
 from app.models import Base
 from app.nl2sql.router import router as nl2sql_router
-from app.routers import chat, conversations, health, runs, tools
+from app.routers import chat, conversations, dev_db, health, runs, tools
 
 
 @asynccontextmanager
@@ -23,9 +24,13 @@ async def lifespan(app: FastAPI):  # type: ignore[no-untyped-def]
         level=getattr(logging, settings.log_level.upper(), logging.INFO),
         format="%(asctime)s %(levelname)s %(name)s %(message)s",
     )
-    # Create tables (dev convenience; use Alembic in production)
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    if settings.run_migrations_on_startup:
+        logging.getLogger("llm_router").info("Running Alembic migrations at startup")
+        await run_migrations_async(settings.resolved_database_url)
+    elif settings.auto_create_schema:
+        # Dev convenience; for production prefer Alembic migrations.
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
     init_registry()
     register_default_tools()
     yield
@@ -48,4 +53,6 @@ app.include_router(chat.router)
 app.include_router(runs.router)
 app.include_router(conversations.router)
 app.include_router(tools.router)
+if settings.dev_db_tools_enabled:
+    app.include_router(dev_db.router)
 app.include_router(nl2sql_router)

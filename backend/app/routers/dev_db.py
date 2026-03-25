@@ -1,0 +1,58 @@
+from __future__ import annotations
+
+import logging
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+
+from app.devdb.schemas import DescribeTableResponse, DevDBQueryRequest, DevDBQueryResponse, ListTablesResponse
+from app.devdb.service import DevDBError, DevDBService
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter(prefix="/api/dev/db", tags=["dev-db"])
+dev_db_service = DevDBService()
+
+
+def _ensure_dev_db_enabled() -> None:
+    try:
+        dev_db_service.ensure_enabled()
+    except DevDBError as exc:
+        # Hide route existence when disabled.
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.get("/tables", response_model=ListTablesResponse)
+async def list_tables(
+    _: None = Depends(_ensure_dev_db_enabled),
+    max_tables: int = Query(default=1000, ge=1, le=5000),
+) -> ListTablesResponse:
+    try:
+        return await dev_db_service.list_tables(max_tables=max_tables)
+    except DevDBError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.get("/table/{table_name}", response_model=DescribeTableResponse)
+async def describe_table(
+    table_name: str,
+    _: None = Depends(_ensure_dev_db_enabled),
+    schema_name: str | None = Query(default=None),
+) -> DescribeTableResponse:
+    try:
+        return await dev_db_service.describe_table(table_name=table_name, schema_name=schema_name)
+    except DevDBError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/query", response_model=DevDBQueryResponse)
+async def run_query(
+    request: DevDBQueryRequest,
+    _: None = Depends(_ensure_dev_db_enabled),
+) -> DevDBQueryResponse:
+    try:
+        return await dev_db_service.query(request)
+    except DevDBError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("Developer DB query route failed")
+        raise HTTPException(status_code=502, detail="Developer DB query failed.") from exc

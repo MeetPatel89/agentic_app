@@ -47,10 +47,14 @@ OPENAI_API_KEY, ANTHROPIC_API_KEY, GOOGLE_API_KEY, MISTRAL_API_KEY,
 GROQ_API_KEY, TOGETHER_API_KEY, AZURE_OPENAI_API_KEY, AZURE_OPENAI_ENDPOINT
 LOCAL_OPENAI_BASE_URL=http://localhost:11434/v1   # for Ollama/vLLM/LM Studio
 DATABASE_URL=sqlite+aiosqlite:///./llm_router.db
+AUTO_CREATE_SCHEMA=true
+DEV_DB_TOOLS_ENABLED=false
+DEV_DB_TOOLS_REQUIRE_LOCALHOST=true
 CORS_ORIGINS=["http://localhost:5173"]
 ```
 
-The SQLite database is auto-created on first startup (no manual migration needed in dev).
+`DATABASE_URL` can point to SQLite, PostgreSQL (`postgresql+asyncpg://...`), or Azure SQL (`mssql+aioodbc://...`).
+Schema auto-create is for dev convenience; for production prefer `AUTO_CREATE_SCHEMA=false` with Alembic migrations.
 
 ## Architecture
 
@@ -58,13 +62,14 @@ The SQLite database is auto-created on first startup (no manual migration needed
 
 Frontend (`:5173`) → Vite proxy → Backend FastAPI (`:8000`) → Provider Adapter → LLM API
 
-Streaming uses Server-Sent Events (SSE). Every request (streaming or not) is persisted as a `Run` record in SQLite.
+Streaming uses Server-Sent Events (SSE). Every request (streaming or not) is persisted as a `Run` record in the configured SQL database.
 
 ### Backend (`backend/app/`)
 
-- **`main.py`** — App entrypoint. Lifespan creates DB tables and initializes the adapter registry. Includes CORS and request-logging middleware.
+- **`main.py`** — App entrypoint. Lifespan optionally creates DB tables (`AUTO_CREATE_SCHEMA`) and initializes the adapter registry. Includes CORS and request-logging middleware.
 - **`adapters/`** — Core extension point. Each provider implements the `ProviderAdapter` ABC (`base.py`): `is_available()`, `chat()`, `stream_chat()`, `list_models()`. `registry.py` auto-discovers and registers all adapters whose credentials are present. Currently fully implemented: OpenAI, Anthropic, OpenAI-compatible (Ollama/vLLM). Stubs exist for: Google, Mistral, Groq, Together, Azure OpenAI.
-- **`routers/`** — Three routers: `chat.py` (`/api/chat`, `/api/chat/stream`), `health.py` (`/health`, `/api/providers/{provider}/models`), `runs.py` (CRUD for run history).
+- **`routers/`** — Core routers: `chat.py` (`/api/chat`, `/api/chat/stream`), `health.py` (`/health`, `/api/providers/{provider}/models`), `runs.py` (run history CRUD), `conversations.py` (conversation history CRUD). Dev-only DB inspection routes live in `dev_db.py` when `DEV_DB_TOOLS_ENABLED=true`.
+- **`devdb/`** — Developer read-only DB inspection module shared by API and CLI (`backend/scripts/dev_db_query.py`), with dialect-aware table/schema query helpers for SQLite, PostgreSQL, and Azure SQL.
 - **`models.py` / `schemas.py`** — SQLAlchemy `Run` ORM model; Pydantic schemas for `ChatRequest`, `NormalizedChatResponse`, and SSE events (`DeltaEvent`, `MetaEvent`, `FinalEvent`, `ErrorEvent`).
 - **`agentic/`** — Stubs for v2 agentic features: `tools.py` (ToolRegistry/Tool ABC), `memory.py` (MemoryStore ABC + InMemoryStore), `traces.py` (TraceContext). The `Run` model already has `trace_id` and `parent_run_id` fields for multi-step tracing.
 
