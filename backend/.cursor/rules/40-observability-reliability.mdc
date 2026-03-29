@@ -1,5 +1,5 @@
 ---
-description: Standardize logging, tracing, and resilient failure handling
+description: Standardize tracing, retries, and failure handling
 globs: backend/app/**/*.py
 alwaysApply: false
 ---
@@ -13,13 +13,13 @@ alwaysApply: false
 
 ## Required Patterns
 
-- Include enough context for debugging without exposing sensitive data.
 - Ensure retries, timeouts, and fallback behavior are explicit in code.
 - Propagate cancellation and timeout context to downstream calls where possible.
 - Fail predictably with stable error contracts.
+- Add enough diagnostic context to make provider and DB failures debuggable.
 
 ## Prohibited Patterns
 
 - No bare `except` blocks that hide root cause.
-- No logging of secrets, tokens, or full private payloads.
 - No noisy per-token logging on hot streaming loops.
+- No silent retries or fallback paths that hide latency spikes or degraded behavior.

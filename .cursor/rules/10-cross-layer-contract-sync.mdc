@@ -1,0 +1,22 @@
+---
+description: Keep backend schemas, API clients, and SSE consumers in sync
+globs: "{backend/app/**/*.py,frontend/src/**/*.ts,frontend/src/**/*.tsx}"
+alwaysApply: false
+---
+
+# Cross-Layer Contract Sync
+
+- Treat `backend/app/schemas.py`, `frontend/src/api/types.ts`, and `frontend/src/hooks/useStream.ts` as one contract surface.
+- When API payloads, SSE events, or endpoint inputs change, update the mirrored frontend types and consumers in the same change.
+- When adding backend capabilities that surface in the UI, wire them through the typed client in `frontend/src/api/client.ts`.
+
+## Required Patterns
+
+- Keep `delta`, `meta`, `final`, and `error` stream events compatible with `useStream`.
+- Update frontend request/response types when backend Pydantic models or route payloads change.
+- Add or update focused tests when contracts or stream behavior change.
+
+## Prohibited Patterns
+
+- No backend-only contract changes that leave frontend types or stream handling stale.
+- No ad hoc fetch calls that re-declare request or response shapes already owned by `api/client.ts` and `api/types.ts`.

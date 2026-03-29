@@ -3,11 +3,10 @@ from __future__ import annotations
 import json
 from functools import lru_cache
 from pathlib import Path
-from urllib.parse import quote_plus
-from urllib.parse import parse_qsl, urlparse
+from urllib.parse import parse_qsl, quote_plus, urlparse
 
-from sqlalchemy.engine import URL
 from pydantic_settings import BaseSettings
+from sqlalchemy.engine import URL
 
 _BACKEND_DIR = Path(__file__).resolve().parent.parent
 

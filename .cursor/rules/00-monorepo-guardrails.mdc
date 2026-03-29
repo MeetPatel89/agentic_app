@@ -1,0 +1,22 @@
+---
+description: Apply shared guardrails across the Python and React monorepo
+alwaysApply: true
+---
+
+# Monorepo Guardrails
+
+- Treat `CLAUDE.md` as the source of truth for project architecture, commands, and repo-specific conventions.
+- Preserve the existing ownership split: FastAPI backend logic in `backend/`, React and typed client logic in `frontend/`.
+- Keep behavior changes paired with focused test updates in the same change set.
+- Prefer extending existing modules and patterns before adding new abstractions.
+
+## Required Patterns
+
+- Keep backend schemas, API shapes, and frontend mirrored types aligned.
+- Put provider integrations behind backend adapters instead of exposing provider details across layers.
+- Use repo-native tooling and conventions: `uv`/`ruff` in backend, `npm`/ESLint/Prettier in frontend.
+
+## Prohibited Patterns
+
+- No duplicate contract definitions scattered outside the established schema and type files.
+- No bypassing existing architectural boundaries for convenience.

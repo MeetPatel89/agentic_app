@@ -1,25 +1,25 @@
 ---
-description: Enforce backend layering and adapter boundaries
+description: Keep FastAPI routers, adapters, and persistence layers separated
 alwaysApply: true
 ---
 
 # Architecture Boundaries
 
-- Keep routing thin: handlers validate input, call domain logic, and shape HTTP responses.
-- Keep provider-specific logic in `backend/app/adapters/` only.
-- Keep persistence concerns in database/repository functions, not in routers.
-- Keep frontend/backend contract types aligned with shared schema definitions.
+- Keep routing thin: validate input, call services/adapters, and shape HTTP responses.
+- Keep provider-specific logic inside `backend/app/adapters/`.
+- Keep database access and transaction orchestration in service/repository helpers, not in routers.
+- Prefer extending existing modules before introducing new abstractions.
 
 ## Required Patterns
 
-- Routers call services/adapters; they do not contain business workflows.
+- Routers call services/adapters; they do not contain multi-step business workflows.
 - Adapters return normalized response models, not provider-native payloads.
-- Shared behavior should extend existing modules before adding new abstractions.
-- New providers must follow the adapter registry pattern already used in this codebase.
+- New providers implement the existing `ProviderAdapter` contract and register through the adapter registry.
+- Keep durable schema changes in Alembic migrations instead of relying on dev-only auto-create behavior.
 
 ## Prohibited Patterns
 
 - No direct provider SDK calls from `backend/app/routers/`.
 - No raw SQL or DB session orchestration in route handlers.
 - No leaking provider-specific fields through API responses.
-- No contract-breaking endpoint or event shape changes without explicit approval.
+- No contract-breaking endpoint, schema, or event-shape changes without explicit approval.

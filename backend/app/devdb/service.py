@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import re
 import time
-from datetime import date, datetime, time as dt_time
+from datetime import date, datetime
+from datetime import time as dt_time
 from decimal import Decimal
-from uuid import UUID
 from urllib.parse import urlparse
+from uuid import UUID
 
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError

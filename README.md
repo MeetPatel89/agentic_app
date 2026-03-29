@@ -33,6 +33,9 @@ uv sync
 
 # Run the server
 uv run uvicorn app.main:app --reload --port 8000
+
+# Run the server in debug mode
+uv run uvicorn app.main:app --reload --port 8000 --log-level debug --access-log
 ```
 
 By default, the backend auto-creates schema on startup (`AUTO_CREATE_SCHEMA=true`).

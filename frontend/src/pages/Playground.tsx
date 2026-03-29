@@ -130,7 +130,7 @@ export function Playground() {
       message: text,
       system_prompt: conversationId ? undefined : systemPrompt || undefined,
       temperature: isReasoning ? null : temperature,
-      max_tokens: maxTokens,
+      max_tokens: Number.isNaN(maxTokens) ? 1024 : maxTokens,
       provider_options: parsedProviderOpts(),
       tool_mode: toolMode,
       tool_names: toolMode === "manual" && enabledToolNames.length > 0 ? enabledToolNames : undefined,

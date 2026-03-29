@@ -23,10 +23,17 @@ async def lifespan(app: FastAPI):  # type: ignore[no-untyped-def]
     logging.basicConfig(
         level=getattr(logging, settings.log_level.upper(), logging.INFO),
         format="%(asctime)s %(levelname)s %(name)s %(message)s",
+        force=True,
     )
     if settings.run_migrations_on_startup:
         logging.getLogger("llm_router").info("Running Alembic migrations at startup")
         await run_migrations_async(settings.resolved_database_url)
+        # Alembic's fileConfig resets root logger to WARN; restore our config.
+        logging.basicConfig(
+            level=getattr(logging, settings.log_level.upper(), logging.INFO),
+            format="%(asctime)s %(levelname)s %(name)s %(message)s",
+            force=True,
+        )
     elif settings.auto_create_schema:
         # Dev convenience; for production prefer Alembic migrations.
         async with engine.begin() as conn:

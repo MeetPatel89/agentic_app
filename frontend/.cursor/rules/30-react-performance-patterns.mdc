@@ -1,0 +1,30 @@
+---
+description: Prevent common React re-render and state management mistakes
+globs: frontend/src/**/*.{ts,tsx}
+alwaysApply: false
+---
+
+# React Performance Patterns
+
+- Derive computable values during render instead of syncing with `useEffect` or storing redundant state.
+- Keep components defined at module scope; never define a component inside another component's render body.
+- Use functional `setState` when the new value depends on the current state to prevent stale closures and remove state from dependency arrays.
+- Use `useRef` for transient values that change frequently but do not drive rendering (scroll positions, timers, flags).
+
+## Required Patterns
+
+- If a value can be computed from current props or state, compute it inline during render instead of storing it in a separate `useState` + `useEffect` sync.
+- Use lazy state initialization (`useState(() => expensive())`) when the initial value involves parsing, I/O, or data structure construction.
+- Use functional `setState` updates (`setItems(prev => [...prev, item])`) when updating based on current state, especially inside `useCallback`.
+- Narrow effect dependencies to primitives: depend on `user.id` rather than `user`, and on derived booleans rather than continuous values like pixel widths.
+- Put interaction-triggered side effects in event handlers directly; do not model user actions as state + `useEffect`.
+- Split combined `useMemo` or `useEffect` computations when they contain independent sub-computations with different dependency sets.
+- Extract default non-primitive parameter values from `memo`'d components to module-level constants (e.g., `const NOOP = () => {}`).
+- Use explicit conditional rendering (`count > 0 ? <Badge /> : null`) instead of `&&` when the left-hand side is a number or could be `0` / `NaN`.
+- Use non-mutating array methods (`toSorted`, `toReversed`, `toSpliced`) instead of `sort` / `reverse` / `splice` to avoid mutating props or state.
+
+## Prohibited Patterns
+
+- No defining React components or hooks inside the body of another component; this causes a full remount on every parent render.
+- No wrapping simple primitive-result expressions (boolean OR, numeric comparison) in `useMemo` when dependency comparison costs more than the expression itself.
+- No `useEffect` that exists solely to derive or sync state from other props/state changes; derive the value inline instead.

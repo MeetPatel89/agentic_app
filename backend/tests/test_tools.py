@@ -533,10 +533,13 @@ class TestToolMode:
         """tool_mode='auto' injects all 5 registered tools into ChatRequest."""
         from app.routers import chat as chat_module
 
-        captured = {}
-
         async def fake_prepare(db, req):
-            conv, chat_req, adapter, trace, parent_run_id = await chat_module._prepare_turn.__wrapped__(db, req) if hasattr(chat_module._prepare_turn, '__wrapped__') else (None, None, None, None, None)
+            if hasattr(chat_module._prepare_turn, '__wrapped__'):
+                conv, chat_req, adapter, trace, parent_run_id = (
+                    await chat_module._prepare_turn.__wrapped__(db, req)
+                )
+            else:
+                _ = (None, None, None, None, None)
             # We can't easily intercept _prepare_turn, so test via the endpoint
             raise AssertionError("should not reach here in this test approach")
 

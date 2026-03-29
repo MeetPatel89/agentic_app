@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import AsyncIterator
+from collections.abc import AsyncIterator
 
-from app.schemas import ChatRequest, NormalizedChatResponse, StreamDelta, StreamFinal, StreamError, StreamMeta
-
+from app.schemas import ChatRequest, NormalizedChatResponse, StreamDelta, StreamError, StreamFinal, StreamMeta
 
 StreamEvent = StreamDelta | StreamMeta | StreamFinal | StreamError
 

@@ -1,6 +1,6 @@
 ---
 description: Require tests for behavior, resilience, and contract safety
-globs: backend/tests/**/*.py
+globs: backend/**/*.py
 alwaysApply: false
 ---
 
@@ -16,6 +16,7 @@ alwaysApply: false
 - Add focused checks for hot paths where latency or throughput can regress.
 - Prefer deterministic tests (mock provider/network boundaries).
 - Avoid flaky timing-based assertions without tolerance windows.
+- Mirror backend schema or SSE changes in frontend contract checks when applicable.
 
 ## Prohibited Patterns
 

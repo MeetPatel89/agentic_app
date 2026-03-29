@@ -33,10 +33,6 @@ class OpenAIAdapter(ProviderAdapter):
         settings = get_settings()
         self._api_key = settings.openai_api_key
         self._client: AsyncOpenAI | None = None
-        print("--------------------------------")
-        print("OpenAI Adapter initialized")
-        print("OpenAI API key: ", self._api_key)
-        print("--------------------------------")
 
     def _get_client(self) -> AsyncOpenAI:
         if self._client is None:
@@ -94,6 +90,10 @@ class OpenAIAdapter(ProviderAdapter):
 
     async def chat(self, req: ChatRequest) -> NormalizedChatResponse:
         client = self._get_client()
+        print("--------------------------------")
+        print("From chat: ")
+        print("Request: ", req)
+        print("--------------------------------")
         resp = await client.chat.completions.create(
             model=req.model,
             messages=self._build_messages(req),  # type: ignore[arg-type]
@@ -102,6 +102,9 @@ class OpenAIAdapter(ProviderAdapter):
             **self._build_tool_kwargs(req),
             **req.provider_options,
         )
+        print("--------------------------------")
+        print("Response from chat: ", resp)
+        print("--------------------------------")
         choice = resp.choices[0]
         usage = resp.usage
         raw = resp.model_dump()
@@ -136,6 +139,10 @@ class OpenAIAdapter(ProviderAdapter):
 
     async def stream_chat(self, req: ChatRequest) -> AsyncIterator[StreamEvent]:
         client = self._get_client()
+        print("--------------------------------")
+        print("From stream_chat: ")
+        print("Request: ", req)
+        print("--------------------------------")
         try:
             stream = await client.chat.completions.create(
                 model=req.model,

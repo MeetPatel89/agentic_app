@@ -1,0 +1,25 @@
+---
+description: Minimize bundle size and optimize loading for the Vite SPA
+globs: frontend/src/**/*.{ts,tsx}
+alwaysApply: false
+---
+
+# Bundle Size And Loading
+
+- Import from specific module paths, not barrel or index files, to avoid pulling in unused code.
+- Use `React.lazy` with dynamic `import()` for components not needed on initial render.
+- Preload lazy components on hover or focus to reduce perceived latency when the user is likely to need them.
+
+## Required Patterns
+
+- Import directly from module paths instead of barrel files (e.g., `import Button from '@mui/material/Button'` not `import { Button } from '@mui/material'`). Vite does not have `optimizePackageImports`, so barrel imports pull in entire libraries.
+- Use `React.lazy(() => import('./HeavyComponent'))` for components that exceed ~50KB or render below the fold or behind user interaction. Wrap with a `<Suspense>` boundary and appropriate fallback.
+- Use conditional `import()` for feature-gated or platform-specific modules; load them in a `useEffect` guarded by the feature condition.
+- Preload heavy bundles on hover or focus of the trigger element by calling `void import('./module')` in `onMouseEnter` / `onFocus` handlers.
+- Apply `content-visibility: auto` with `contain-intrinsic-size` on scrollable list items (message lists, run history tables) to defer off-screen rendering.
+- Defer non-critical third-party scripts (analytics, error tracking) by loading them after initial render via dynamic import in a `useEffect`.
+
+## Prohibited Patterns
+
+- No static top-level imports of heavy third-party libraries (>100KB) in components that render on initial page load, unless the library is needed for above-the-fold content.
+- No `import *` or wildcard re-exports from local barrel files.

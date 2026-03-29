@@ -38,6 +38,10 @@ class ToolExecutor:
         req: ChatRequest,
     ) -> NormalizedChatResponse:
         """Run the tool-calling loop until the LLM produces a final text response."""
+        print("--------------------------------")
+        print("Executing with tools")
+        print("Request: ", req)
+        print("--------------------------------")
         messages = list(req.messages)
         total_usage = UsageInfo(prompt_tokens=0, completion_tokens=0, total_tokens=0)
 

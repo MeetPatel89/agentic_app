@@ -1,0 +1,22 @@
+---
+description: Use the typed frontend API layer and preserve stream expectations
+globs: frontend/src/**/*.{ts,tsx}
+alwaysApply: false
+---
+
+# Typed API And Streaming
+
+- Route backend calls through `frontend/src/api/client.ts` instead of ad hoc fetch logic in pages or components.
+- Keep `frontend/src/api/types.ts` aligned with backend request, response, and SSE payload shapes.
+- Preserve the event contract expected by `frontend/src/hooks/useStream.ts`.
+
+## Required Patterns
+
+- Add new endpoints to the shared `api` client before consuming them in UI code.
+- Extend existing frontend types instead of re-declaring API payloads inside components.
+- Keep stream parsing resilient to partial chunks and explicit about `delta`, `final`, and `error` handling.
+
+## Prohibited Patterns
+
+- No duplicating backend payload types in page or component files.
+- No SSE shape changes without updating `useStream.ts` and related tests.

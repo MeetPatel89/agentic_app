@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import AsyncIterator
+from collections.abc import AsyncIterator
 
 from app.adapters.base import ProviderAdapter, StreamEvent
 from app.config import get_settings

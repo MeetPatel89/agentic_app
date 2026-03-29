@@ -1,14 +1,14 @@
 ---
-description: Protect API schema compatibility and SSE event contracts
-globs: backend/app/routers/**/*.py
+description: Protect API schemas and streaming event contracts
+globs: backend/app/**/*.py
 alwaysApply: false
 ---
 
 # API Contracts And SSE
 
-- Use typed Pydantic request/response schemas for all endpoints.
+- Use typed Pydantic request/response models for API boundaries.
 - Keep API shapes backward compatible unless explicitly approved.
-- For chat streaming, preserve SSE event types expected by frontend consumers.
+- Treat `backend/app/schemas.py` and frontend mirrored types as one contract.
 
 ## Required Patterns
 
@@ -22,3 +22,4 @@ alwaysApply: false
 - Emit `delta`, `meta`, `final`, and `error` events in expected sequence.
 - Keep SSE payloads JSON-serializable and schema-stable.
 - Ensure stream termination paths are explicit for both success and failure.
+- Update frontend stream parsing and mirrored types in the same change when event payloads evolve.

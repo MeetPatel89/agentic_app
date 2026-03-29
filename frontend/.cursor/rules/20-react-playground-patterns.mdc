@@ -1,0 +1,23 @@
+---
+description: Follow the existing React page, component, and state patterns
+globs: frontend/src/**/*.{ts,tsx}
+alwaysApply: false
+---
+
+# React Playground Patterns
+
+- Keep route composition in `src/App.tsx`, page orchestration in `src/pages/`, and reusable UI in `src/components/`.
+- Keep network and persistence concerns out of presentational components such as settings and message list components.
+- Reuse existing hooks and state flows before introducing parallel state machines.
+
+## Required Patterns
+
+- Keep page-level coordination such as conversation loading, stream lifecycle, and API calls in page components or hooks.
+- Use `import type` for TypeScript-only imports where the file already follows that pattern.
+- Guard app-level one-time initialization (auth checks, analytics init, service workers) with a module-level flag or move it to the entry module; do not rely solely on `useEffect([], ...)` which re-runs on remount and runs twice under StrictMode.
+- Preserve current UX constraints, such as disabling system prompt edits after a conversation starts and using the typed tool settings flow.
+
+## Prohibited Patterns
+
+- No burying API calls deep inside leaf UI components.
+- No reorganizing route or component ownership without a clear simplification benefit.

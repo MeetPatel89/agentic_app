@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import AsyncIterator
+from collections.abc import AsyncIterator
+from typing import Any
 
 from openai import AsyncOpenAI
 
@@ -13,6 +14,8 @@ from app.schemas import (
     StreamError,
     StreamFinal,
     StreamMeta,
+    ToolCall,
+    ToolCallFunction,
     UsageInfo,
 )
 
@@ -37,8 +40,28 @@ class OpenAICompatibleAdapter(ProviderAdapter):
     def is_available(self) -> bool:
         return bool(self._base_url)
 
-    def _build_messages(self, req: ChatRequest) -> list[dict]:
-        return [{"role": m.role, "content": m.content} for m in req.messages]
+    def _build_messages(self, req: ChatRequest) -> list[dict[str, Any]]:
+        result: list[dict[str, Any]] = []
+        for m in req.messages:
+            msg: dict[str, Any] = {"role": m.role}
+            if m.content is not None:
+                msg["content"] = m.content
+            if m.name is not None:
+                msg["name"] = m.name
+            if m.tool_call_id is not None:
+                msg["tool_call_id"] = m.tool_call_id
+            if m.tool_calls:
+                msg["tool_calls"] = [tc.model_dump() for tc in m.tool_calls]
+            result.append(msg)
+        return result
+
+    def _build_tool_kwargs(self, req: ChatRequest) -> dict[str, Any]:
+        kwargs: dict[str, Any] = {}
+        if req.tools:
+            kwargs["tools"] = [t.model_dump() for t in req.tools]
+        if req.tool_choice:
+            kwargs["tool_choice"] = req.tool_choice
+        return kwargs
 
     async def list_models(self) -> list[str]:
         client = self._get_client()
@@ -51,7 +74,7 @@ class OpenAICompatibleAdapter(ProviderAdapter):
 
     async def chat(self, req: ChatRequest) -> NormalizedChatResponse:
         client = self._get_client()
-        temp_kwargs: dict = {}
+        temp_kwargs: dict[str, Any] = {}
         if req.temperature is not None:
             temp_kwargs["temperature"] = req.temperature
         resp = await client.chat.completions.create(
@@ -59,11 +82,27 @@ class OpenAICompatibleAdapter(ProviderAdapter):
             messages=self._build_messages(req),  # type: ignore[arg-type]
             max_tokens=req.max_tokens,
             **temp_kwargs,
+            **self._build_tool_kwargs(req),
             **req.provider_options,
         )
         choice = resp.choices[0]
         usage = resp.usage
         raw = resp.model_dump()
+
+        normalized_tool_calls = None
+        if choice.message.tool_calls:
+            normalized_tool_calls = [
+                ToolCall(
+                    id=tc.id,
+                    type=tc.type,
+                    function=ToolCallFunction(
+                        name=tc.function.name,
+                        arguments=tc.function.arguments,
+                    ),
+                )
+                for tc in choice.message.tool_calls
+            ]
+
         return NormalizedChatResponse(
             output_text=choice.message.content or "",
             finish_reason=choice.finish_reason,
@@ -73,6 +112,7 @@ class OpenAICompatibleAdapter(ProviderAdapter):
                 completion_tokens=usage.completion_tokens if usage else None,
                 total_tokens=usage.total_tokens if usage else None,
             ),
+            tool_calls=normalized_tool_calls,
             raw=raw,
         )
 
