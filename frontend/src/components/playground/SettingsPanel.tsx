@@ -143,7 +143,10 @@ export const SettingsPanel = memo(function SettingsPanel({
             min={1}
             max={128000}
             value={Number.isNaN(maxTokens) ? "" : maxTokens}
-            onChange={(e) => onMaxTokensChange(parseInt(e.target.value))}
+            onChange={(e) => {
+              const val = e.target.value;
+              onMaxTokensChange(val === "" ? NaN : parseInt(val));
+            }}
             onBlur={() => {
               if (Number.isNaN(maxTokens) || maxTokens < 1) onMaxTokensChange(1024);
             }}

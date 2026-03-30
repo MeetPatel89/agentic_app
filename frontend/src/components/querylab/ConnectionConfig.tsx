@@ -17,7 +17,7 @@ export const ConnectionConfig = memo(function ConnectionConfig({ connectionStrin
         autoComplete="off"
       />
       <span style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4 }}>
-        Supported: postgresql+asyncpg, mysql+aiomysql, sqlite+aiosqlite
+        Supported: postgresql+asyncpg, mysql+aiomysql, sqlite+aiosqlite, mssql+aioodbc
       </span>
     </div>
   );

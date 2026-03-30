@@ -22,7 +22,7 @@ from app.nl2sql.schemas import (
     SQLValidateRequest,
     SQLValidationResult,
 )
-from app.schemas import StreamDelta, StreamError, StreamMeta
+from app.schemas import StreamError
 
 logger = logging.getLogger(__name__)
 
@@ -96,19 +96,19 @@ async def generate_stream(
         error_msg: str | None = None
         try:
             async for event in service.stream_generate_sql(req, adapter):
-                if isinstance(event, StreamDelta):
-                    yield f"event: delta\ndata: {event.model_dump_json()}\n\n"
-                elif isinstance(event, StreamMeta):
-                    yield f"event: meta\ndata: {event.model_dump_json()}\n\n"
-                elif isinstance(event, NL2SQLStreamFinal):
+                if isinstance(event, NL2SQLStreamFinal):
                     latency = (time.perf_counter() - start) * 1000
                     nl2sql_response = NL2SQLResponse(
                         generated_sql=event.generated_sql,
                         explanation=event.explanation,
+                        queries=event.queries,
+                        recommended_index=event.recommended_index,
+                        assumptions=event.assumptions,
                         dialect=event.dialect,
                         validation=event.validation,
                         usage=event.usage,
                         latency_ms=round(latency, 2),
+                        raw_llm_output=event.raw_llm_output,
                     )
                     yield f"event: querylab_final\ndata: {event.model_dump_json()}\n\n"
                 elif isinstance(event, StreamError):

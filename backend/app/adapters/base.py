@@ -24,7 +24,7 @@ class ProviderAdapter(ABC):
         ...
 
     @abstractmethod
-    async def stream_chat(self, req: ChatRequest) -> AsyncIterator[StreamEvent]:
+    def stream_chat(self, req: ChatRequest) -> AsyncIterator[StreamEvent]:
         """Yield streaming events: delta, meta, final, or error."""
         ...
 

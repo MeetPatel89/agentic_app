@@ -1,17 +1,21 @@
 from __future__ import annotations
 
+import inspect
+import json
 import logging
 import re
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable
+from typing import Any, cast
 
 from app.adapters.base import ProviderAdapter, StreamEvent
-from app.nl2sql.prompts import build_system_prompt
+from app.nl2sql.prompts import NL2SQL_JSON_SCHEMA, RESPONSE_FORMAT_PROVIDERS, build_system_prompt
 from app.nl2sql.sandbox import validate_syntax, validate_with_sandbox
 from app.nl2sql.schemas import (
     NL2SQLRequest,
     NL2SQLResponse,
     NL2SQLStreamFinal,
     SQLDialect,
+    SQLQuery,
     SQLValidationResult,
 )
 from app.schemas import ChatRequest, Message, StreamDelta, StreamError, StreamFinal, StreamMeta
@@ -28,9 +32,10 @@ async def generate_sql(
     response = await adapter.chat(chat_req)
 
     raw_text = response.output_text
-    generated_sql, explanation = _extract_sql_and_explanation(raw_text)
+    parsed = _parse_llm_response(raw_text, request.dialect)
 
-    validation = _run_validation(generated_sql, request.dialect, request.sandbox_ddl)
+    recommended = parsed["queries"][parsed["recommended_index"]]
+    validation = _run_validation(recommended["sql"], request.dialect, request.sandbox_ddl)
 
     usage = {
         "prompt_tokens": response.usage.prompt_tokens,
@@ -38,12 +43,18 @@ async def generate_sql(
         "total_tokens": response.usage.total_tokens,
     }
 
+    queries = [SQLQuery(**q) for q in parsed["queries"]]
+
     return NL2SQLResponse(
-        generated_sql=generated_sql,
-        explanation=explanation,
+        generated_sql=recommended["sql"],
+        explanation=recommended["explanation"],
+        queries=queries,
+        recommended_index=parsed["recommended_index"],
+        assumptions=parsed["assumptions"],
         dialect=request.dialect,
         validation=validation,
         usage=usage,
+        raw_llm_output=raw_text,
     )
 
 
@@ -51,23 +62,30 @@ async def stream_generate_sql(
     request: NL2SQLRequest,
     adapter: ProviderAdapter,
 ) -> AsyncIterator[StreamEvent | NL2SQLStreamFinal]:
-    """Stream SQL generation, then validate on completion.
+    """Consume a provider text stream, then emit a single structured result.
 
-    Yields standard StreamDelta/StreamMeta events during generation.
-    On completion, yields an NL2SQLStreamFinal (instead of the regular StreamFinal)
-    that includes validation results.
+    Does not forward token deltas to callers (avoids streaming partial JSON in the UI).
+    On completion, yields NL2SQLStreamFinal with validation and ``raw_llm_output``.
     """
     chat_req = _build_chat_request(request)
     collected_text = ""
     usage_info: dict[str, int | None] = {}
 
     try:
-        async for event in adapter.stream_chat(chat_req):
+        stream_candidate = cast(
+            AsyncIterator[StreamEvent] | Awaitable[AsyncIterator[StreamEvent]],
+            adapter.stream_chat(chat_req),
+        )
+        if inspect.isawaitable(stream_candidate):
+            stream = await cast(Awaitable[AsyncIterator[StreamEvent]], stream_candidate)
+        else:
+            stream = cast(AsyncIterator[StreamEvent], stream_candidate)
+
+        async for event in stream:
             if isinstance(event, StreamDelta):
                 collected_text += event.text
-                yield event
             elif isinstance(event, StreamMeta):
-                yield event
+                pass
             elif isinstance(event, StreamFinal):
                 if event.response:
                     collected_text = event.response.output_text or collected_text
@@ -83,15 +101,21 @@ async def stream_generate_sql(
         yield StreamError(message=str(exc))
         return
 
-    generated_sql, explanation = _extract_sql_and_explanation(collected_text)
-    validation = _run_validation(generated_sql, request.dialect, request.sandbox_ddl)
+    parsed = _parse_llm_response(collected_text, request.dialect)
+    recommended = parsed["queries"][parsed["recommended_index"]]
+    validation = _run_validation(recommended["sql"], request.dialect, request.sandbox_ddl)
+    queries = [SQLQuery(**q) for q in parsed["queries"]]
 
     yield NL2SQLStreamFinal(
-        generated_sql=generated_sql,
-        explanation=explanation,
+        generated_sql=recommended["sql"],
+        explanation=recommended["explanation"],
+        queries=queries,
+        recommended_index=parsed["recommended_index"],
+        assumptions=parsed["assumptions"],
         dialect=request.dialect,
         validation=validation,
         usage=usage_info,
+        raw_llm_output=collected_text,
     )
 
 
@@ -101,10 +125,23 @@ def _build_chat_request(request: NL2SQLRequest) -> ChatRequest:
         custom_prompt=request.system_prompt,
     )
 
-    messages = [
-        Message(role="system", content=system_prompt),
-        Message(role="user", content=request.natural_language),
-    ]
+    messages: list[Message] = [Message(role="system", content=system_prompt)]
+
+    for turn in request.conversation_history:
+        messages.append(Message(role=turn.role, content=turn.content))
+
+    messages.append(Message(role="user", content=request.natural_language))
+
+    provider_options = dict(request.provider_options)
+    if request.provider in RESPONSE_FORMAT_PROVIDERS:
+        provider_options["response_format"] = {
+            "type": "json_schema",
+            "json_schema": {
+                "name": "nl2sql_response",
+                "strict": True,
+                "schema": NL2SQL_JSON_SCHEMA,
+            },
+        }
 
     return ChatRequest(
         provider=request.provider,
@@ -112,41 +149,85 @@ def _build_chat_request(request: NL2SQLRequest) -> ChatRequest:
         messages=messages,
         temperature=request.temperature,
         max_tokens=request.max_tokens,
-        provider_options=request.provider_options,
+        provider_options=provider_options,
     )
 
 
-_SQL_FENCE_RE = re.compile(r"```(?:sql)?\s*\n?(.*?)```", re.DOTALL | re.IGNORECASE)
-_EXPLANATION_RE = re.compile(r"--\s*Explanation:\s*(.*)", re.DOTALL)
+# ---------------------------------------------------------------------------
+# Response parsing
+# ---------------------------------------------------------------------------
+
+_JSON_FENCE_RE = re.compile(r"```(?:json)?\s*\n?(.*?)```", re.DOTALL | re.IGNORECASE)
 
 
-def _extract_sql_and_explanation(text: str) -> tuple[str, str]:
-    """Extract SQL and explanation from LLM output.
+def _parse_llm_response(text: str, dialect: SQLDialect = SQLDialect.postgresql) -> dict[str, Any]:
+    """Parse structured JSON from LLM output.
 
-    Handles both fenced code blocks and raw SQL output.
+    Tries direct JSON parse first, then strips markdown fences.
+    Falls back to a legacy single-query wrapper if JSON parsing fails entirely.
     """
-    fence_match = _SQL_FENCE_RE.search(text)
+    cleaned = text.strip()
+
+    # Try direct JSON parse
+    parsed = _try_json_parse(cleaned)
+    if parsed is not None:
+        return _normalize_parsed(parsed)
+
+    # Try extracting from markdown fences
+    fence_match = _JSON_FENCE_RE.search(cleaned)
     if fence_match:
-        sql_block = fence_match.group(1).strip()
-        remainder = text[fence_match.end():].strip()
-    else:
-        sql_block = text.strip()
-        remainder = ""
+        parsed = _try_json_parse(fence_match.group(1).strip())
+        if parsed is not None:
+            return _normalize_parsed(parsed)
 
-    explanation_match = _EXPLANATION_RE.search(sql_block)
-    if explanation_match:
-        explanation = explanation_match.group(1).strip()
-        sql_block = sql_block[: explanation_match.start()].strip()
-    elif remainder:
-        explanation_match = _EXPLANATION_RE.search(remainder)
-        if explanation_match:
-            explanation = explanation_match.group(1).strip()
-        else:
-            explanation = remainder
-    else:
-        explanation = ""
+    # Fallback: treat entire output as a single SQL statement (legacy behavior)
+    logger.warning("NL2SQL: JSON parse failed, falling back to raw text extraction")
+    return {
+        "queries": [{"title": "Generated query", "sql": cleaned, "explanation": ""}],
+        "recommended_index": 0,
+        "assumptions": [],
+    }
 
-    return sql_block, explanation
+
+def _try_json_parse(text: str) -> dict[str, Any] | None:
+    try:
+        data = json.loads(text)
+        if isinstance(data, dict) and "queries" in data:
+            return data
+    except (json.JSONDecodeError, TypeError):
+        pass
+    return None
+
+
+def _normalize_parsed(data: dict[str, Any]) -> dict[str, Any]:
+    """Ensure all expected fields exist and have valid values."""
+    queries = data.get("queries", [])
+    if not queries:
+        queries = [{"title": "Generated query", "sql": "", "explanation": ""}]
+
+    for q in queries:
+        q.setdefault("title", "Query")
+        q.setdefault("sql", "")
+        q.setdefault("explanation", "")
+
+    rec_idx = data.get("recommended_index", 0)
+    if not isinstance(rec_idx, int) or rec_idx < 0 or rec_idx >= len(queries):
+        rec_idx = 0
+
+    assumptions = data.get("assumptions", [])
+    if not isinstance(assumptions, list):
+        assumptions = []
+
+    return {
+        "queries": queries,
+        "recommended_index": rec_idx,
+        "assumptions": [str(a) for a in assumptions],
+    }
+
+
+# ---------------------------------------------------------------------------
+# Validation
+# ---------------------------------------------------------------------------
 
 
 def _run_validation(

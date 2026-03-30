@@ -5,23 +5,14 @@ interface Props {
   explanation: string;
   dialect: string;
   isStreaming?: boolean;
-  streamingText?: string;
 }
 
-export const SQLOutput = memo(function SQLOutput({
-  sql,
-  explanation,
-  dialect,
-  isStreaming,
-  streamingText,
-}: Props) {
-  const displayText = isStreaming ? streamingText || "" : sql;
-
+export const SQLOutput = memo(function SQLOutput({ sql, explanation, dialect, isStreaming }: Props) {
   const handleCopy = useCallback(() => {
-    navigator.clipboard.writeText(sql || streamingText || "");
-  }, [sql, streamingText]);
+    navigator.clipboard.writeText(sql);
+  }, [sql]);
 
-  if (!displayText && !isStreaming) return null;
+  if (!sql && !isStreaming) return null;
 
   return (
     <div style={{ marginTop: 16 }}>
@@ -41,7 +32,7 @@ export const SQLOutput = memo(function SQLOutput({
             {dialect}
           </span>
         </label>
-        {displayText && (
+        {sql && !isStreaming && (
           <button className="btn btn-ghost btn-sm" onClick={handleCopy} type="button">
             Copy
           </button>
@@ -55,9 +46,14 @@ export const SQLOutput = memo(function SQLOutput({
           lineHeight: 1.6,
           whiteSpace: "pre-wrap",
           margin: 0,
+          minHeight: isStreaming ? 48 : undefined,
         }}
       >
-        <code>{displayText}</code>
+        {isStreaming ? (
+          <code style={{ color: "var(--text-muted)" }}>Generating SQL…</code>
+        ) : (
+          <code>{sql}</code>
+        )}
         {isStreaming && <span className="cursor-blink" />}
       </pre>
       {explanation && !isStreaming && (

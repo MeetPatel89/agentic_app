@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from app.nl2sql.schemas import SQLDialect
 
 _DIALECT_GUIDANCE: dict[SQLDialect, str] = {
@@ -42,25 +44,79 @@ into precise, production-quality SQL queries.
 ## Database Schema
 {schema_context}
 
-## Rules
-1. Return ONLY the SQL query — no markdown fences, no commentary before or after the query.
-2. After the SQL, on a new line starting with "-- Explanation:", provide a brief explanation \
-of the query logic.
-3. Use meaningful table aliases.
-4. Prefer explicit JOINs over implicit comma-joins.
-5. Always qualify column names with table aliases when the query involves multiple tables.
-6. Use parameterized-style placeholders ($1, :param, or ?) only if the question implies user input.
-7. Avoid SELECT * in production queries — select only needed columns.
-8. Use CTEs (WITH clauses) for complex multi-step queries for readability.
-9. Add appropriate WHERE clauses for safety on UPDATE/DELETE statements.
-
 ## SQL Dialect
 {dialect_guidance}
 
-## Output Format
-<SQL query>
--- Explanation: <brief description of what the query does and why>
+## Instructions
+- Generate one or more SQL query approaches for the given question.
+- When the question has multiple valid interpretations or approaches (e.g., with/without \
+handling ties, different performance tradeoffs, strict vs. lenient matching), provide each \
+as a separate query.
+- For straightforward questions with one clear answer, a single query is fine.
+- Set `recommended_index` to the 0-based index of the query you recommend most.
+- List any assumptions you made about the schema or data in `assumptions`.
+
+## SQL Rules
+- Use meaningful table aliases.
+- Prefer explicit JOINs over implicit comma-joins.
+- Always qualify column names with table aliases when the query involves multiple tables.
+- Use parameterized-style placeholders ($1, :param, or ?) only if the question implies user input.
+- Avoid SELECT * in production queries — select only needed columns.
+- Use CTEs (WITH clauses) for complex multi-step queries for readability.
+- Add appropriate WHERE clauses for safety on UPDATE/DELETE statements.
+
+## Response Format
+You MUST respond with a JSON object and nothing else. No markdown fences, no commentary \
+outside the JSON. The JSON must match this exact structure:
+
+{{
+  "queries": [
+    {{
+      "title": "Short descriptive title for this approach",
+      "sql": "The SQL query text",
+      "explanation": "Brief explanation of what this query does and any tradeoffs"
+    }}
+  ],
+  "recommended_index": 0,
+  "assumptions": ["Any assumptions made about the schema, data, or ambiguous terms"]
+}}
+
+Rules for the JSON response:
+- `queries` must contain at least one entry.
+- Each `sql` value must be a single, complete SQL statement.
+- `recommended_index` must be a valid index into the `queries` array.
+- `assumptions` may be an empty array if no assumptions were needed.
 """
+
+# JSON Schema used with OpenAI-family response_format for guaranteed structure.
+NL2SQL_JSON_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "queries": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "title": {"type": "string"},
+                    "sql": {"type": "string"},
+                    "explanation": {"type": "string"},
+                },
+                "required": ["title", "sql", "explanation"],
+                "additionalProperties": False,
+            },
+        },
+        "recommended_index": {"type": "integer"},
+        "assumptions": {
+            "type": "array",
+            "items": {"type": "string"},
+        },
+    },
+    "required": ["queries", "recommended_index", "assumptions"],
+    "additionalProperties": False,
+}
+
+# Providers whose SDKs accept the OpenAI-style response_format parameter.
+RESPONSE_FORMAT_PROVIDERS = frozenset({"openai", "local_openai_compatible", "azure_openai"})
 
 
 def build_system_prompt(

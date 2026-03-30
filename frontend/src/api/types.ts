@@ -177,6 +177,11 @@ export interface PaginatedConversations {
 
 export type SQLDialect = "postgresql" | "tsql" | "mysql" | "sqlite" | "bigquery" | "snowflake";
 
+export interface NL2SQLHistoryMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
 export interface NL2SQLRequest {
   provider: string;
   model: string;
@@ -186,6 +191,7 @@ export interface NL2SQLRequest {
   temperature: number | null;
   max_tokens: number;
   sandbox_ddl?: string;
+  conversation_history?: NL2SQLHistoryMessage[];
   provider_options: Record<string, unknown>;
 }
 
@@ -197,14 +203,25 @@ export interface SQLValidationResult {
   sandbox_error: string | null;
 }
 
+export interface SQLQuery {
+  title: string;
+  sql: string;
+  explanation: string;
+}
+
 export interface NL2SQLResponse {
   generated_sql: string;
   explanation: string;
+  queries: SQLQuery[];
+  recommended_index: number;
+  assumptions: string[];
   dialect: SQLDialect;
   validation: SQLValidationResult;
   usage: Record<string, number | null>;
   run_id: string | null;
   latency_ms: number | null;
+  /** Verbatim model completion before parsing (often JSON). */
+  raw_llm_output?: string;
 }
 
 export interface SQLValidateRequest {
@@ -216,9 +233,9 @@ export interface SQLValidateRequest {
 export interface SQLExecuteRequest {
   sql: string;
   dialect: SQLDialect;
-  connection_string: string;
   timeout_seconds?: number;
   max_rows?: number;
+  read_only?: boolean;
 }
 
 export interface SQLExecuteResponse {
@@ -230,12 +247,16 @@ export interface SQLExecuteResponse {
 }
 
 export interface QueryLabStreamFinalEvent {
-  type: "querylab_final";
+  type?: string;
   generated_sql: string;
   explanation: string;
+  queries: SQLQuery[];
+  recommended_index: number;
+  assumptions: string[];
   dialect: SQLDialect;
   validation: SQLValidationResult;
   usage: Record<string, number | null>;
   run_id: string | null;
   latency_ms: number | null;
+  raw_llm_output?: string;
 }

@@ -15,6 +15,11 @@ class SQLDialect(StrEnum):
     snowflake = "snowflake"
 
 
+class NL2SQLHistoryMessage(BaseModel):
+    role: str = Field(..., pattern="^(user|assistant)$")
+    content: str
+
+
 class NL2SQLRequest(BaseModel):
     provider: str
     model: str
@@ -30,7 +35,17 @@ class NL2SQLRequest(BaseModel):
         None,
         description="DDL statements for creating in-memory sandbox tables (CREATE TABLE ...)",
     )
+    conversation_history: list[NL2SQLHistoryMessage] = Field(
+        default_factory=list,
+        description="Prior user/assistant turns for multi-turn SQL refinement",
+    )
     provider_options: dict[str, Any] = Field(default_factory=dict)
+
+
+class SQLQuery(BaseModel):
+    title: str = Field(..., description="Short descriptive title for this query approach")
+    sql: str = Field(..., description="The SQL query")
+    explanation: str = Field("", description="Explanation of the approach, tradeoffs, or caveats")
 
 
 class SQLValidationResult(BaseModel):
@@ -42,13 +57,20 @@ class SQLValidationResult(BaseModel):
 
 
 class NL2SQLResponse(BaseModel):
-    generated_sql: str
-    explanation: str
+    generated_sql: str = Field(..., description="SQL from the recommended query (backward compat)")
+    explanation: str = Field("", description="Explanation from the recommended query (backward compat)")
+    queries: list[SQLQuery] = Field(default_factory=list, description="All generated query variants")
+    recommended_index: int = Field(0, description="Index into queries for the recommended approach")
+    assumptions: list[str] = Field(default_factory=list, description="Assumptions the LLM made about schema or data")
     dialect: SQLDialect
     validation: SQLValidationResult
     usage: dict[str, int | None] = Field(default_factory=dict)
     run_id: str | None = None
     latency_ms: float | None = None
+    raw_llm_output: str = Field(
+        "",
+        description="Verbatim model completion text (JSON or prose) before structured parsing",
+    )
 
 
 class SQLValidateRequest(BaseModel):
@@ -60,9 +82,9 @@ class SQLValidateRequest(BaseModel):
 class SQLExecuteRequest(BaseModel):
     sql: str = Field(..., min_length=1)
     dialect: SQLDialect = SQLDialect.postgresql
-    connection_string: str = Field(..., min_length=1)
     timeout_seconds: int = Field(default=30, ge=1, le=300)
     max_rows: int = Field(default=1000, ge=1, le=50000)
+    read_only: bool = True
 
 
 class SQLExecuteResponse(BaseModel):
@@ -77,8 +99,12 @@ class NL2SQLStreamFinal(BaseModel):
     type: str = "final"
     generated_sql: str
     explanation: str
+    queries: list[SQLQuery] = Field(default_factory=list)
+    recommended_index: int = 0
+    assumptions: list[str] = Field(default_factory=list)
     dialect: SQLDialect
     validation: SQLValidationResult
     usage: dict[str, int | None] = Field(default_factory=dict)
     run_id: str | None = None
     latency_ms: float | None = None
+    raw_llm_output: str = ""
