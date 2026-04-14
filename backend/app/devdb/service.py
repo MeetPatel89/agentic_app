@@ -14,7 +14,14 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.config import get_settings
 from app.database import create_app_engine
-from app.devdb.dialects import detect_backend, list_tables_sql, validate_identifier
+from app.devdb.dialects import (
+    detect_backend,
+    foreign_keys_pragma_sql,
+    foreign_keys_sql,
+    list_tables_sql,
+    primary_keys_sql,
+    validate_identifier,
+)
 from app.devdb.schemas import (
     ColumnInfo,
     DescribeTableResponse,
@@ -111,13 +118,24 @@ class DevDBService:
 
                     result = await session.execute(text(query), params)
                     rows = result.mappings().all()
+
+                    pk_columns: set[str] = set()
+                    pk_sql = primary_keys_sql(backend)
+                    if pk_sql:
+                        pk_params = {
+                            "table_name": safe_table,
+                            "schema_name": safe_schema,
+                        }
+                        pk_result = await session.execute(text(pk_sql), pk_params)
+                        pk_columns = {str(row["column_name"]) for row in pk_result.mappings().all()}
+
                     columns = [
                         ColumnInfo(
                             name=str(row["column_name"]),
                             data_type=self._to_string_or_none(row.get("data_type")),
                             nullable=self._nullable_value(row.get("is_nullable")),
                             default=self._to_string_or_none(row.get("column_default")),
-                            is_primary_key=False,
+                            is_primary_key=str(row["column_name"]) in pk_columns,
                         )
                         for row in rows
                     ]
@@ -133,6 +151,66 @@ class DevDBService:
         finally:
             await engine.dispose()
 
+    async def list_foreign_keys(
+        self,
+        *,
+        table_name: str,
+        schema_name: str | None = None,
+        connection_string: str | None = None,
+    ) -> list[dict[str, str | None]]:
+        """Return a list of FK descriptors for a single table.
+
+        Each entry: {column_name, referenced_schema, referenced_table, referenced_column, constraint_name}.
+        """
+        conn_str = self._resolve_connection_string(connection_string)
+        backend = detect_backend(conn_str)
+
+        safe_table = validate_identifier(table_name, "table")
+        safe_schema = validate_identifier(schema_name, "schema") if schema_name else None
+
+        engine = create_app_engine(conn_str)
+        try:
+            session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+            async with session_factory() as session:
+                if backend == "sqlite":
+                    pragma_sql = foreign_keys_pragma_sql(safe_table)
+                    result = await session.execute(text(pragma_sql))
+                    rows = result.mappings().all()
+                    return [
+                        {
+                            "constraint_name": None,
+                            "column_name": str(row["from"]),
+                            "referenced_schema": None,
+                            "referenced_table": str(row["table"]),
+                            "referenced_column": str(row["to"]) if row.get("to") else None,
+                        }
+                        for row in rows
+                    ]
+
+                dialect_result = foreign_keys_sql(backend)
+                if dialect_result is None:
+                    return []
+                fk_sql, _ = dialect_result
+                result = await session.execute(
+                    text(fk_sql),
+                    {"table_name": safe_table, "schema_name": safe_schema},
+                )
+                rows = result.mappings().all()
+                return [
+                    {
+                        "constraint_name": self._to_string_or_none(row.get("constraint_name")),
+                        "column_name": str(row["column_name"]),
+                        "referenced_schema": self._to_string_or_none(row.get("referenced_schema")),
+                        "referenced_table": str(row["referenced_table"]),
+                        "referenced_column": str(row["referenced_column"]),
+                    }
+                    for row in rows
+                ]
+        except SQLAlchemyError as exc:
+            raise DevDBError(f"Failed to list foreign keys: {exc.__class__.__name__}") from exc
+        finally:
+            await engine.dispose()
+
     async def query(self, request: DevDBQueryRequest) -> DevDBQueryResponse:
         conn_str = self._resolve_connection_string(request.connection_string)
         backend = detect_backend(conn_str)
@@ -143,18 +221,13 @@ class DevDBService:
             session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
             async with session_factory() as session:
                 start = time.perf_counter()
-                result = await session.execute(
-                    text(request.sql).execution_options(timeout=request.timeout_seconds)
-                )
+                result = await session.execute(text(request.sql).execution_options(timeout=request.timeout_seconds))
                 elapsed_ms = (time.perf_counter() - start) * 1000
 
                 columns = list(result.keys())
                 all_rows = result.fetchall()
                 truncated = len(all_rows) > request.max_rows
-                rows = [
-                    [self._normalize_value(value) for value in row]
-                    for row in all_rows[: request.max_rows]
-                ]
+                rows = [[self._normalize_value(value) for value in row] for row in all_rows[: request.max_rows]]
 
                 return DevDBQueryResponse(
                     backend=backend,
@@ -211,9 +284,7 @@ class DevDBService:
 
         lowered = normalized.lower()
         if not lowered.startswith(_ALLOWED_SQL_PREFIXES):
-            raise DevDBError(
-                "Only read-only statements are allowed (SELECT, WITH, EXPLAIN, SHOW, PRAGMA)."
-            )
+            raise DevDBError("Only read-only statements are allowed (SELECT, WITH, EXPLAIN, SHOW, PRAGMA).")
 
         if _MUTATING_SQL_RE.search(normalized):
             raise DevDBError("Mutating SQL keywords are not allowed in developer query mode.")

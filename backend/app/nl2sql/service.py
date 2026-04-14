@@ -122,6 +122,7 @@ async def stream_generate_sql(
 def _build_chat_request(request: NL2SQLRequest) -> ChatRequest:
     system_prompt = build_system_prompt(
         dialect=request.dialect,
+        schema_context=request.schema_context,
         custom_prompt=request.system_prompt,
     )
 

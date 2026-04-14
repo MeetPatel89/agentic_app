@@ -6,6 +6,8 @@ import type {
   HealthResponse,
   NL2SQLRequest,
   NL2SQLResponse,
+  SchemaContextFormat,
+  SchemaContextResponse,
   PaginatedConversations,
   PaginatedRuns,
   ProviderModelsResponse,
@@ -95,4 +97,24 @@ export const api = {
       method: "POST",
       body: JSON.stringify(req),
     }),
+
+  // Dev DB — schema context (requires DEV_DB_TOOLS_ENABLED on the backend)
+  fetchSchemaContext: (params?: {
+    format?: SchemaContextFormat;
+    tables?: string[];
+    includeForeignKeys?: boolean;
+  }) => {
+    const search = new URLSearchParams();
+    if (params?.format) search.set("format", params.format);
+    if (params?.tables && params.tables.length > 0) {
+      search.set("tables", params.tables.join(","));
+    }
+    if (params?.includeForeignKeys === false) {
+      search.set("include_foreign_keys", "false");
+    }
+    const qs = search.toString();
+    return request<SchemaContextResponse>(
+      `/api/dev/db/schema-context${qs ? `?${qs}` : ""}`,
+    );
+  },
 };

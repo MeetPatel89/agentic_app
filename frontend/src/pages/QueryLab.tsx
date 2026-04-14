@@ -7,10 +7,11 @@ import type {
   SQLExecuteResponse,
   SQLQuery,
   QueryLabStreamFinalEvent,
+  SchemaContextFormat,
 } from "../api/types";
 import { DialectSelector } from "../components/querylab/DialectSelector";
 import { ResultsTable } from "../components/querylab/ResultsTable";
-import { SchemaPromptEditor } from "../components/querylab/SchemaPromptEditor";
+import { SchemaPromptEditor, type SchemaEditorMode } from "../components/querylab/SchemaPromptEditor";
 import { SQLOutput } from "../components/querylab/SQLOutput";
 import { ValidationPanel } from "../components/querylab/ValidationPanel";
 
@@ -213,7 +214,10 @@ export function QueryLab() {
 
   // QueryLab settings
   const [dialect, setDialect] = useState<SQLDialect>("postgresql");
+  const [schemaEditorMode, setSchemaEditorMode] = useState<SchemaEditorMode>("auto");
+  const [schemaContext, setSchemaContext] = useState("");
   const [systemPrompt, setSystemPrompt] = useState("");
+  const [schemaFormat, setSchemaFormat] = useState<SchemaContextFormat>("compact_ddl");
   const [sandboxDDL, setSandboxDDL] = useState("");
   const [temperature, setTemperature] = useState(0.3);
   const [maxTokens, setMaxTokens] = useState(2048);
@@ -365,7 +369,9 @@ export function QueryLab() {
       model,
       natural_language: text,
       dialect,
-      system_prompt: systemPrompt || undefined,
+      system_prompt: schemaEditorMode === "manual" && systemPrompt ? systemPrompt : undefined,
+      schema_context:
+        schemaEditorMode === "auto" && schemaContext ? schemaContext : undefined,
       temperature: isReasoning ? null : temperature,
       max_tokens: maxTokens,
       sandbox_ddl: sandboxDDL || undefined,
@@ -458,7 +464,7 @@ export function QueryLab() {
         inputRef.current?.focus();
       }
     })();
-  }, [naturalLanguage, currentQuery, lastResult, executeResult, selectedQueryIndex, provider, model, dialect, systemPrompt, temperature, maxTokens, sandboxDDL, conversationHistory, isReasoning, mode, executeSQL]);
+  }, [naturalLanguage, currentQuery, lastResult, executeResult, selectedQueryIndex, provider, model, dialect, schemaEditorMode, schemaContext, systemPrompt, temperature, maxTokens, sandboxDDL, conversationHistory, isReasoning, mode, executeSQL]);
 
   const handleAbort = useCallback(() => {
     abortRef.current?.abort();
@@ -608,7 +614,16 @@ export function QueryLab() {
               />
             </div>
 
-            <SchemaPromptEditor value={systemPrompt} onChange={setSystemPrompt} />
+            <SchemaPromptEditor
+              mode={schemaEditorMode}
+              onModeChange={setSchemaEditorMode}
+              schemaContext={schemaContext}
+              onSchemaContextChange={setSchemaContext}
+              systemPrompt={systemPrompt}
+              onSystemPromptChange={setSystemPrompt}
+              format={schemaFormat}
+              onFormatChange={setSchemaFormat}
+            />
 
             <div className="form-group full-width">
               <label>Sandbox DDL (optional — for execution validation)</label>

@@ -188,11 +188,21 @@ export interface NL2SQLRequest {
   natural_language: string;
   dialect: SQLDialect;
   system_prompt?: string;
+  schema_context?: string;
   temperature: number | null;
   max_tokens: number;
   sandbox_ddl?: string;
   conversation_history?: NL2SQLHistoryMessage[];
   provider_options: Record<string, unknown>;
+}
+
+export type SchemaContextFormat = "compact_ddl" | "structured_catalog" | "concise_notation";
+
+export interface SchemaContextResponse {
+  format: SchemaContextFormat;
+  schema_text: string;
+  table_count: number;
+  estimated_tokens: number;
 }
 
 export interface SQLValidationResult {

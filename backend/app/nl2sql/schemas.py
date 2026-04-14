@@ -27,7 +27,11 @@ class NL2SQLRequest(BaseModel):
     dialect: SQLDialect = SQLDialect.postgresql
     system_prompt: str | None = Field(
         None,
-        description="Large context blob containing schema definitions, business rules, and few-shot examples",
+        description="Full system-prompt override. When set, the default template is bypassed entirely.",
+    )
+    schema_context: str | None = Field(
+        None,
+        description="Schema / catalog text injected into the default prompt template's {schema_context} slot.",
     )
     temperature: float | None = 0.7
     max_tokens: int = 2048

@@ -18,6 +18,7 @@ def test_devdb_router_not_registered_when_disabled(monkeypatch):
     main_module = _reload_main()
     route_paths = {route.path for route in main_module.app.routes}
     assert "/api/dev/db/tables" not in route_paths
+    assert "/api/dev/db/schema-context" not in route_paths
     get_settings.cache_clear()
 
 
@@ -28,4 +29,5 @@ def test_devdb_router_registered_when_enabled(monkeypatch):
     main_module = _reload_main()
     route_paths = {route.path for route in main_module.app.routes}
     assert "/api/dev/db/tables" in route_paths
+    assert "/api/dev/db/schema-context" in route_paths
     get_settings.cache_clear()

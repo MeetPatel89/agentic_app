@@ -7,7 +7,7 @@ import pytest
 
 from app.adapters.base import ProviderAdapter
 from app.nl2sql.schemas import NL2SQLHistoryMessage, NL2SQLRequest, SQLDialect
-from app.nl2sql.service import _parse_llm_response, generate_sql, stream_generate_sql
+from app.nl2sql.service import _build_chat_request, _parse_llm_response, generate_sql, stream_generate_sql
 from app.schemas import NormalizedChatResponse, StreamDelta, StreamFinal, UsageInfo
 
 
@@ -118,6 +118,35 @@ class TestParseLLMResponse:
         result = _parse_llm_response(text)
         assert len(result["queries"]) == 1
         assert result["queries"][0]["sql"] == ""
+
+
+class TestBuildChatRequest:
+    def test_schema_context_populates_default_template(self):
+        req = NL2SQLRequest(
+            provider="openai",
+            model="gpt-4o",
+            natural_language="any",
+            dialect=SQLDialect.postgresql,
+            schema_context="CREATE TABLE foo (id INT);",
+        )
+        chat = _build_chat_request(req)
+        system = chat.messages[0].content
+        assert "CREATE TABLE foo (id INT);" in system
+        assert "## Database Schema" in system
+
+    def test_system_prompt_override_bypasses_schema_context(self):
+        req = NL2SQLRequest(
+            provider="openai",
+            model="gpt-4o",
+            natural_language="any",
+            dialect=SQLDialect.postgresql,
+            schema_context="IGNORED",
+            system_prompt="You are a SQL bot. {dialect_guidance}",
+        )
+        chat = _build_chat_request(req)
+        system = chat.messages[0].content
+        assert "IGNORED" not in system
+        assert "You are a SQL bot" in system
 
 
 class TestGenerateSQL:
